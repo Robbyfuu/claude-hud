@@ -1,8 +1,10 @@
 import { en } from "./en.js";
+import { es } from "./es.js";
 import { zhHans } from "./zh-Hans.js";
 import { zhHant } from "./zh-Hant.js";
 const locales = {
     en,
+    es,
     zh: zhHans,
     "zh-Hans": zhHans,
     "zh-Hant": zhHant,
@@ -13,6 +15,7 @@ const locales = {
 // https://www.unicode.org/cldr/charts/latest/supplemental/likely_subtags.html
 const CANONICAL = {
     "en": "en",
+    "es": "es",
     "zh": "zh-Hans",
     "zh-Hans": "zh-Hans",
     "zh-Hant": "zh-Hant",

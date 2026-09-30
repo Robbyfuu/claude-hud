@@ -60,6 +60,19 @@ export interface StdinData {
         level?: string | null;
         [key: string]: unknown;
     } | null;
+    version?: string;
+    output_style?: {
+        name?: string | null;
+    } | null;
+    prompt_cache?: {
+        warm?: boolean | null;
+        hit_ratio?: number | null;
+    } | null;
+    pr?: {
+        number?: number | null;
+        url?: string | null;
+        review_state?: string | null;
+    } | null;
 }
 export interface ToolEntry {
     id: string;
@@ -74,10 +87,31 @@ export interface AgentEntry {
     type: string;
     model?: string;
     description?: string;
+    name?: string;
     status: 'running' | 'completed';
     startTime: Date;
     endTime?: Date;
     background?: boolean;
+}
+/**
+ * Per-subagent detail read from `<session>/subagents/agent-<id>.jsonl`.
+ * Used by the `panel` layout's agent table.
+ */
+export interface SubagentDetail {
+    skills: string[];
+    todosDone: number;
+    todosTotal: number;
+    currentTool?: {
+        name: string;
+        target?: string;
+    };
+    lastTool?: {
+        name: string;
+        target?: string;
+    };
+    toolCount: number;
+    contextTokens?: number;
+    lastActivityAt?: Date;
 }
 export interface TodoItem {
     content: string;
@@ -136,6 +170,7 @@ export interface SessionTokenUsage {
 }
 export interface TranscriptData {
     tools: ToolEntry[];
+    toolCounts?: Record<string, number>;
     skills: string[];
     mcpServers: string[];
     /**
@@ -177,5 +212,6 @@ export interface RenderContext {
     effortLevel?: string;
     effortSymbol?: string;
     authInfo?: AuthInfo | null;
+    subagents?: Map<string, SubagentDetail>;
 }
 //# sourceMappingURL=types.d.ts.map
