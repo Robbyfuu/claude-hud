@@ -6,6 +6,7 @@ import { renderToolsLine } from './tools-line.js';
 import { renderSkillsLine, renderMcpLine } from './skills-mcp-line.js';
 import { renderAgentsLine } from './agents-line.js';
 import { renderTodosLine } from './todos-line.js';
+import { renderPanel } from './panel.js';
 import {
   renderIdentityLine,
   renderProjectLine,
@@ -598,6 +599,15 @@ export function render(ctx: RenderContext): void {
     : (detectedWidth ?? configuredMaxWidth ?? UNKNOWN_TERMINAL_WIDTH);
 
   let lines: string[];
+
+  if (lineLayout === 'panel') {
+    // The panel sizes every line to the terminal itself; wrapping would break
+    // the box borders, so print it as-is.
+    for (const line of renderPanel(ctx, terminalWidth)) {
+      console.log(`${RESET}${line}`);
+    }
+    return;
+  }
 
   if (lineLayout === 'expanded') {
     const renderedLines = renderExpanded(ctx, terminalWidth);

@@ -31,10 +31,42 @@ export type MessageKey =
   | "format.tokPerSec"
   | "format.justNow"
   | "format.relativeTime"
+  // Panel layout
+  | "panel.session"
+  | "panel.usage"
+  | "panel.environment"
+  | "panel.activity"
+  | "panel.context"
+  | "panel.fiveHour"
+  | "panel.weekly"
+  | "panel.tasks"
+  | "panel.tools"
+  | "panel.rules"
+  | "panel.hooks"
+  | "panel.cache"
+  | "panel.col.agent"
+  | "panel.col.task"
+  | "panel.col.skills"
+  | "panel.col.progress"
+  | "panel.col.now"
+  | "panel.col.tokens"
+  | "panel.col.time"
+  | "panel.agentsRunning"
+  | "panel.agentsDone"
+  | "panel.agentsRunningOne"
+  | "panel.agentsDoneOne"
+  | "panel.moreAgents"
+  | "panel.noPlan"
+  | "panel.uses"
+  | "panel.done"
+  | "panel.thinking"
+  | "panel.noActivity"
+  | "panel.noGit"
+  | "panel.compact"
   // Init
   | "init.initializing"
   | "init.macosNote";
 
 export type Messages = Record<MessageKey, string>;
 
-export type Language = "en" | "zh" | "zh-Hans" | "zh-Hant" | "zh-TW";
+export type Language = "en" | "es" | "zh" | "zh-Hans" | "zh-Hant" | "zh-TW";

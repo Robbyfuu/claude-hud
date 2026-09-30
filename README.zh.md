@@ -161,8 +161,8 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 
 | 选项 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `language` | `en` \| `zh` \| `zh-Hans` \| `zh-Hant` \| `zh-TW` | `en` | HUD 标签语言。设为 `zh` 或 `zh-Hans` 启用简体中文，设为 `zh-Hant` 或 `zh-TW` 启用繁体中文 |
-| `lineLayout` | string | `expanded` | 布局：`expanded`（多行）或 `compact`（单行） |
+| `language` | `en` \| `es` \| `zh` \| `zh-Hans` \| `zh-Hant` \| `zh-TW` | `en` | HUD 标签语言。设为 `es` 启用西班牙语，设为 `zh` 或 `zh-Hans` 启用简体中文，设为 `zh-Hant` 或 `zh-TW` 启用繁体中文 |
+| `lineLayout` | string | `expanded` | 布局：`expanded`（多行）、`compact`（单行）或 `panel`（带边框的面板，含逐个代理的表格） |
 | `pathLevels` | 1-3 \| `full` | 1 | 项目路径显示的目录层级数，或设为 `full` 显示完整绝对路径 |
 | `maxWidth` | number \| `null` | `null` | 可选的回退宽度，仅在终端宽度检测完全失败时使用 |
 | `forceMaxWidth` | boolean | false | 当设置了 `maxWidth` 时始终使用它，即使终端宽度检测返回更小的值 |
@@ -180,6 +180,9 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 | `jjStatus.enabled` | boolean | false | 显式启用 jj（Jujutsu）状态。启用后若找到真实的 `.jj` 目录，该仓库将显示 jj 而不是 git，二者不会同时运行 |
 | `jjStatus.showDirty` | boolean | true | 当 jj 工作副本提交与其父提交不同时显示 `*` |
 | `jjStatus.showConflicts` | boolean | true | 当 jj 工作副本提交包含未解决冲突时显示 `!conflict` |
+| `panel.icons` | `none` \| `nerd` | `none` | panel 布局的图标。`nerd` 使用 Nerd Font 字形（模型、文件夹、分支、时钟、重置），终端需使用 Nerd Font |
+| `panel.maxAgents` | number | 5 | panel 活动框中最多显示的代理行数（1-20），运行中的代理始终优先 |
+| `panel.completedRetentionSeconds` | number | 120 | 已完成的代理在 panel 代理表中保留的秒数（0-86400） |
 | `display.showModel` | boolean | true | 显示模型名称 `[Opus]` |
 | `display.modelSource` | `stdin` \| `auto` \| `transcript` | `stdin` | 控制模型名称来源。`stdin` 保持默认行为；`auto` 仅在 transcript 返回非 Claude 模型时切换，用于检测代理路由；`transcript` 始终使用 API 响应中的模型。Transcript 模型值会清理终端转义字符并截断为 80 个字符 |
 | `display.showProvider` | boolean | false | 在模型名称*之前*显示提供商标签，例如 `[Bedrock \| Opus 4.6]`。自定义代理提供同名模型时有用。关闭时，自动检测的提供商仍跟在模型后面 |

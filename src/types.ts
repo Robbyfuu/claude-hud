@@ -63,6 +63,19 @@ export interface StdinData {
   // shape is kept for backwards compatibility with the original PR #471 design
   // that future-proofed a string form before Anthropic had committed a schema.
   effort?: string | { level?: string | null; [key: string]: unknown } | null;
+  version?: string;
+  output_style?: { name?: string | null } | null;
+  // Main-conversation prompt cache stats (Claude Code v2.1.251+).
+  prompt_cache?: {
+    warm?: boolean | null;
+    hit_ratio?: number | null;
+  } | null;
+  // Open pull request for the current branch.
+  pr?: {
+    number?: number | null;
+    url?: string | null;
+    review_state?: string | null;
+  } | null;
 }
 
 export interface ToolEntry {
@@ -85,6 +98,25 @@ export interface AgentEntry {
   startTime: Date;
   endTime?: Date;
   background?: boolean;
+}
+
+/**
+ * Per-subagent detail read from `<session>/subagents/agent-<id>.jsonl`.
+ * Used by the `panel` layout's agent table.
+ */
+export interface SubagentDetail {
+  // Skills preloaded by the agent definition plus skills invoked via the Skill tool.
+  skills: string[];
+  // Progress of the subagent's own task list (TaskCreate/TaskUpdate or TodoWrite).
+  todosDone: number;
+  todosTotal: number;
+  // Tool currently waiting for a result, or the last tool used.
+  currentTool?: { name: string; target?: string };
+  lastTool?: { name: string; target?: string };
+  toolCount: number;
+  // Input + cache tokens of the subagent's latest request (its context size).
+  contextTokens?: number;
+  lastActivityAt?: Date;
 }
 
 export interface TodoItem {
@@ -153,6 +185,8 @@ export interface SessionTokenUsage {
 
 export interface TranscriptData {
   tools: ToolEntry[];
+  // Session-wide tool use counts by tool name (tools holds only the last 20).
+  toolCounts?: Record<string, number>;
   skills: string[];
   mcpServers: string[];
   /**
@@ -219,4 +253,6 @@ export interface RenderContext {
   // Auth method + account for the current login (see auth.ts). Only populated
   // when display.showAuth or display.showAuthUser is enabled.
   authInfo?: AuthInfo | null;
+  // Subagent details keyed by the spawning tool_use id (panel layout only).
+  subagents?: Map<string, SubagentDetail>;
 }

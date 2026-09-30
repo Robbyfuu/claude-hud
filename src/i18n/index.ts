@@ -1,14 +1,16 @@
 import type { Language, MessageKey, Messages } from "./types.js";
 import { en } from "./en.js";
+import { es } from "./es.js";
 import { zhHans } from "./zh-Hans.js";
 import { zhHant } from "./zh-Hant.js";
 
 export type { Language, MessageKey, Messages };
 
-type CanonicalLanguage = "en" | "zh-Hans" | "zh-Hant";
+type CanonicalLanguage = "en" | "es" | "zh-Hans" | "zh-Hant";
 
 const locales: Record<CanonicalLanguage | "zh" | "zh-TW", Messages> = {
   en,
+  es,
   zh: zhHans,
   "zh-Hans": zhHans,
   "zh-Hant": zhHant,
@@ -20,6 +22,7 @@ const locales: Record<CanonicalLanguage | "zh" | "zh-TW", Messages> = {
 // https://www.unicode.org/cldr/charts/latest/supplemental/likely_subtags.html
 const CANONICAL: Record<Language, CanonicalLanguage> = {
   "en": "en",
+  "es": "es",
   "zh": "zh-Hans",
   "zh-Hans": "zh-Hans",
   "zh-Hant": "zh-Hant",

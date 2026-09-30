@@ -64,6 +64,7 @@ src/
 ├── index.ts             # Entry point
 ├── stdin.ts             # Parse Claude's JSON input
 ├── transcript.ts        # Parse transcript JSONL
+├── subagents.ts         # Per-subagent detail from <session>/subagents/*.jsonl (panel layout)
 ├── config-reader.ts     # Read MCP/rules configs
 ├── config.ts            # Load/validate user config
 ├── git.ts               # Git status (branch, dirty, ahead/behind)
@@ -87,6 +88,7 @@ src/
     ├── tools-line.ts        # Tool activity (opt-in)
     ├── skills-mcp-line.ts   # Skills & MCP activity (opt-in)
     ├── agents-line.ts       # Agent status (opt-in)
+    ├── panel.ts             # Boxed `panel` layout (session/usage/environment + agent table)
     ├── todos-line.ts        # Todo progress (opt-in)
     ├── colors.ts            # ANSI color helpers
     ├── width.ts             # Terminal width / CJK-aware measurement

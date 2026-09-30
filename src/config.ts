@@ -12,7 +12,10 @@ const MAX_CONFIG_FILE_BYTES = 64 * 1024;
 const MAX_CONFIG_NESTING_DEPTH = 8;
 const UNSAFE_CONFIG_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
-export type LineLayoutType = 'compact' | 'expanded';
+export type LineLayoutType = 'compact' | 'expanded' | 'panel';
+
+/** Icon set used by the `panel` layout: Nerd Font glyphs or none. */
+export type PanelIconMode = 'nerd' | 'none';
 
 export type AutocompactBufferMode = 'enabled' | 'disabled';
 export type ContextValueMode = 'percent' | 'tokens' | 'remaining' | 'both';
@@ -188,6 +191,14 @@ export interface HudConfig {
     showDirty: boolean;
     showConflicts: boolean;
   };
+  // Options for the boxed `panel` line layout.
+  panel: {
+    icons: PanelIconMode;
+    // Max agent rows in the activity box (running agents always come first).
+    maxAgents: number;
+    // How long a finished agent stays in the table, in seconds.
+    completedRetentionSeconds: number;
+  };
   display: {
     showModel: boolean;
     showProject: boolean;
@@ -317,6 +328,11 @@ export const DEFAULT_CONFIG: HudConfig = {
     showDirty: true,
     showConflicts: true,
   },
+  panel: {
+    icons: 'none',
+    maxAgents: 5,
+    completedRetentionSeconds: 120,
+  },
   display: {
     showModel: true,
     showProject: true,
@@ -425,7 +441,7 @@ function validatePathLevels(value: unknown): value is PathLevels {
 }
 
 function validateLineLayout(value: unknown): value is LineLayoutType {
-  return value === 'compact' || value === 'expanded';
+  return value === 'compact' || value === 'expanded' || value === 'panel';
 }
 
 function validateAutocompactBuffer(value: unknown): value is AutocompactBufferMode {
@@ -445,7 +461,7 @@ function validateUsageValue(value: unknown): value is UsageValueMode {
 }
 
 function validateLanguage(value: unknown): value is Language {
-  return value === 'en' || value === 'zh' || value === 'zh-Hans' || value === 'zh-Hant' || value === 'zh-TW';
+  return value === 'en' || value === 'es' || value === 'zh' || value === 'zh-Hans' || value === 'zh-Hant' || value === 'zh-TW';
 }
 
 function validateModelFormat(value: unknown): value is ModelFormatMode {
@@ -779,6 +795,20 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
       : DEFAULT_CONFIG.jjStatus.showConflicts,
   };
 
+  const rawPanel = (migrated as Record<string, unknown>).panel as Partial<HudConfig['panel']> | undefined;
+  const panel = {
+    icons: rawPanel?.icons === 'nerd' || rawPanel?.icons === 'none'
+      ? rawPanel.icons
+      : DEFAULT_CONFIG.panel.icons,
+    maxAgents: typeof rawPanel?.maxAgents === 'number' && Number.isFinite(rawPanel.maxAgents)
+      ? Math.min(20, Math.max(1, Math.floor(rawPanel.maxAgents)))
+      : DEFAULT_CONFIG.panel.maxAgents,
+    completedRetentionSeconds: typeof rawPanel?.completedRetentionSeconds === 'number'
+      && Number.isFinite(rawPanel.completedRetentionSeconds)
+      ? Math.min(86_400, Math.max(0, Math.floor(rawPanel.completedRetentionSeconds)))
+      : DEFAULT_CONFIG.panel.completedRetentionSeconds,
+  };
+
   const display = {
     showModel: typeof migrated.display?.showModel === 'boolean'
       ? migrated.display.showModel
@@ -1024,7 +1054,7 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
       : DEFAULT_CONFIG.colors.barEmpty,
   };
 
-  return { language, lineLayout, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, projectLineOrder, gitStatus, jjStatus, display, colors };
+  return { language, lineLayout, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, projectLineOrder, gitStatus, jjStatus, panel, display, colors };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

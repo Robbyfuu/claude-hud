@@ -176,8 +176,8 @@ Simplified and Traditional Chinese HUD labels are available as explicit opt-ins.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `language` | `en` \| `zh` \| `zh-Hans` \| `zh-Hant` \| `zh-TW` | `en` | HUD label language. Use `zh` or `zh-Hans` for Simplified Chinese and `zh-Hant` or `zh-TW` for Traditional Chinese. |
-| `lineLayout` | string | `expanded` | Layout: `expanded` (multi-line) or `compact` (single line) |
+| `language` | `en` \| `es` \| `zh` \| `zh-Hans` \| `zh-Hant` \| `zh-TW` | `en` | HUD label language. Use `es` for Spanish, `zh` or `zh-Hans` for Simplified Chinese and `zh-Hant` or `zh-TW` for Traditional Chinese. |
+| `lineLayout` | string | `expanded` | Layout: `expanded` (multi-line), `compact` (single line) or `panel` (boxed panes with a per-agent table, see [Panel layout](#panel-layout)) |
 | `pathLevels` | 1-3 \| `full` | 1 | Directory levels to show in project path, or `full` to show the entire absolute path |
 | `maxWidth` | number \| `null` | `null` | Optional fallback width used only when terminal width detection fails completely |
 | `forceMaxWidth` | boolean | false | Always use `maxWidth` when it is set, even if terminal width detection returns a smaller value |
@@ -195,6 +195,9 @@ Simplified and Traditional Chinese HUD labels are available as explicit opt-ins.
 | `jjStatus.enabled` | boolean | false | Opt in to jj (Jujutsu) status. When enabled and a real `.jj` directory is found, jj is used instead of git for that repo — never both |
 | `jjStatus.showDirty` | boolean | true | Show `*` when the working-copy commit differs from its parent |
 | `jjStatus.showConflicts` | boolean | true | Show a `!conflict` marker when the working-copy commit has an unresolved conflict |
+| `panel.icons` | `none` \| `nerd` | `none` | Panel layout icons. `nerd` uses Nerd Font glyphs (model, folder, branch, clock, reset); needs a Nerd Font in the terminal |
+| `panel.maxAgents` | number | 5 | Max agent rows in the panel's activity box (1-20). Running agents always come first |
+| `panel.completedRetentionSeconds` | number | 120 | How long a finished agent stays in the panel's agent table (0-86400) |
 | `display.showModel` | boolean | true | Show model name `[Opus]` |
 | `display.modelSource` | `stdin` \| `auto` \| `transcript` | `stdin` | Controls which source the model name comes from. `stdin` preserves the default behavior and always uses what Claude Code reports. `auto` opts into proxy redirect detection by using transcript models only for non-Claude models. `transcript` always uses the model from the API response. Transcript model values are terminal-sanitized and capped at 80 characters |
 | `display.showProvider` | boolean | false | Show the provider label *before* the model name, e.g. `[Bedrock \| Opus 4.6]`. Useful when a custom proxy serves identically-named models from different providers. When off, an auto-detected provider still trails the model as before |
@@ -435,6 +438,36 @@ Example fallback snapshot:
 - `!` = modified files, `+` = added/staged, `✘` = deleted, `?` = untracked
 - Counts of 0 are omitted for cleaner display
 
+### Panel layout
+
+Set `"lineLayout": "panel"` for a boxed dashboard sized to the terminal width:
+
+```
+╭─ session ────────────────────────────╮ ╭─ usage ────────────────────────────────╮ ╭─ environment ────────────────╮
+│ Opus 5.5 · 1M · high                 │ │ context ▇▇▇▇▇▇▇▇▇   54% 540k/1M        │ │ CLAUDE.md   2  rules       1 │
+│ clay-academy                         │ │ 5 hours ▇▇▇▇▇▇▇▇▇    5% ↻ 2h 44m       │ │ MCP         9  hooks       5 │
+│ feat/kids-monthly-days-selection ● … │ │ weekly  ▇▇▇▇▇▇▇▇▇   31% ↻ Sun 01:44    │ │ cache 91% ●                  │
+│ 7h 11m · $4.82 · +312 −48            │ │ tasks   ▇▇▇▇▇▇▇▇▇   2/6 Revisar halla… │ │ v2.1.270                     │
+╰──────────────────────────────────────╯ ╰────────────────────────────────────────╯ ╰──────────────────────────────╯
+╭─ activity ───────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ tools  Bash 16  Edit 1  Read 1  Skill 1  Write 1                                              2 running · 1 done │
+│ ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ │
+│ AGENT                 TASK                     SKILLS            PROGRESS             NOW                   TIME │
+│ ⠋ nestjs-developer    Fix K3 Task 1 review f…  nestjs-best-… +1  ▇▇▇▇▇▇▇▇▇▇  60% 3/5  Edit monthly-day…   3m 18s │
+│ ⠋ test-writer         Add e2e tests for mont…  testing-strategy  ▇▇▇▇▇▇▇▇▇▇  25% 1/4  Read kids.e2e-sp…   1m 46s │
+│ ✓ code-reviewer       Review K3 Task 1 diff    code-review       ▇▇▇▇▇▇▇▇▇▇ done      —                   3m 12s │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+The agent table reads each subagent's own transcript (`<session>/subagents/agent-<id>.jsonl`):
+
+- **SKILLS**: skills preloaded by the agent definition's `skills:` frontmatter plus skills the agent invoked with the Skill tool.
+- **PROGRESS**: completed / total items of the agent's own task list (TaskCreate/TaskUpdate or TodoWrite). Agents that never make a task list show `no plan` and their tool-use count.
+- **NOW**: the tool the agent is waiting on (for example `Edit monthly-days.service.ts`).
+- **TOK**: the agent's current context size (input + cache tokens of its latest request).
+
+Columns drop out as the terminal narrows (TOK, then SKILLS, then NOW); below about 76 columns the panes stack and each agent takes two lines. Set `refreshInterval` on your `statusLine` (see [Auto-Refresh](#auto-refresh)) so spinners and timers keep moving while agents work in the background.
+
 ### Jujutsu (jj) support
 
 Set `jjStatus.enabled` to `true` to opt in. When a real `.jj` directory is found
@@ -492,7 +525,7 @@ Leaving it unset (or setting an explicit negative: `0`, `false`, `off`, `no`) ke
 
 **Config not applying?**
 - Check for JSON syntax errors: invalid JSON silently falls back to defaults
-- Ensure valid values: `pathLevels` must be 1, 2, 3, or `full`; `lineLayout` must be `expanded` or `compact`; `maxWidth` must be a positive number
+- Ensure valid values: `pathLevels` must be 1, 2, 3, or `full`; `lineLayout` must be `expanded`, `compact` or `panel`; `maxWidth` must be a positive number
 - Delete config and run `/claude-hud:configure` to regenerate
 
 **Git status missing?**

@@ -63,6 +63,8 @@ interface TranscriptLine {
     resolvedModel?: unknown;
     isAsync?: unknown;
     status?: unknown;
+    // TaskCreate results carry the id the task list assigned.
+    task?: { id?: unknown };
   };
   compactMetadata?: {
     trigger?: string;
@@ -106,6 +108,7 @@ interface SerializedAgentEntry extends Omit<AgentEntry, 'startTime' | 'endTime'>
 
 interface SerializedTranscriptData {
   tools: SerializedToolEntry[];
+  toolCounts?: Record<string, number>;
   skills: string[];
   mcpServers: string[];
   mcpErrors: string[];
@@ -132,7 +135,7 @@ interface TranscriptCacheFile {
   data: SerializedTranscriptData;
 }
 
-const TRANSCRIPT_CACHE_VERSION = 18;
+const TRANSCRIPT_CACHE_VERSION = 19;
 const MCP_TOOL_NAME_PATTERN = /^mcp__(.+?)__(.+)$/;
 const ACTIVITY_NAME_MAX_LEN = 64;
 const MESSAGE_ID_MAX_LEN = 128;
@@ -363,6 +366,7 @@ function serializeTranscriptData(data: TranscriptData): SerializedTranscriptData
       startTime: tool.startTime.toISOString(),
       endTime: tool.endTime?.toISOString(),
     })),
+    toolCounts: data.toolCounts ? { ...data.toolCounts } : undefined,
     skills: [...data.skills],
     mcpServers: [...data.mcpServers],
     mcpErrors: [...data.mcpErrors],
@@ -394,6 +398,7 @@ function deserializeTranscriptData(data: SerializedTranscriptData): TranscriptDa
       startTime: new Date(tool.startTime),
       endTime: tool.endTime ? new Date(tool.endTime) : undefined,
     })),
+    toolCounts: normalizeToolCounts(data.toolCounts),
     skills: normalizeNameList(data.skills),
     mcpServers: normalizeNameList(data.mcpServers),
     mcpErrors: normalizeNameList(data.mcpErrors).slice(0, MCP_ERROR_SERVERS_MAX),
@@ -426,6 +431,17 @@ function deserializeTranscriptData(data: SerializedTranscriptData): TranscriptDa
     ultracodeActive: typeof data.ultracodeActive === 'boolean' ? data.ultracodeActive : undefined,
     lastAssistantModel: sanitizeTranscriptModel(data.lastAssistantModel),
   };
+}
+
+function normalizeToolCounts(value: unknown): Record<string, number> | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const counts: Record<string, number> = {};
+  for (const [name, count] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof count === 'number' && Number.isFinite(count) && count > 0 && name.length <= ACTIVITY_NAME_MAX_LEN) {
+      counts[name] = Math.trunc(count);
+    }
+  }
+  return counts;
 }
 
 function readTranscriptCache(transcriptPath: string, state: TranscriptFileState): TranscriptData | null {
@@ -960,10 +976,21 @@ function processEntry(
         }
       } else {
         toolMap.set(block.id, toolEntry);
+        if (entry.isSidechain !== true) {
+          const counts = result.toolCounts ?? (result.toolCounts = {});
+          const countKey = normalizeActivityName(block.name) ?? block.name.slice(0, ACTIVITY_NAME_MAX_LEN);
+          counts[countKey] = (counts[countKey] ?? 0) + 1;
+        }
       }
     }
 
     if (block.type === 'tool_result' && block.tool_use_id) {
+      const createdIndex = taskIdToIndex.get(block.tool_use_id);
+      const assignedTaskId = entry.toolUseResult?.task?.id;
+      if (createdIndex !== undefined && (typeof assignedTaskId === 'string' || typeof assignedTaskId === 'number')) {
+        taskIdToIndex.set(String(assignedTaskId), createdIndex);
+      }
+
       const tool = toolMap.get(block.tool_use_id);
       if (tool) {
         tool.status = block.is_error ? 'error' : 'completed';
