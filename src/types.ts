@@ -79,6 +79,8 @@ export interface AgentEntry {
   type: string;
   model?: string;
   description?: string;
+  // Addressable teammate name (Agent `name` input); matches idle notifications.
+  name?: string;
   status: 'running' | 'completed';
   startTime: Date;
   endTime?: Date;

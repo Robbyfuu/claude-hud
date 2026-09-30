@@ -74,6 +74,8 @@ interface TranscriptLine {
   // entering / leaving ultracode effort.
   attachment?: {
     type?: string;
+    // e.g. `SessionStart:resume` on hook_success entries.
+    hookName?: string;
   };
 }
 
@@ -513,6 +515,11 @@ export async function parseTranscript(transcriptPath: string): Promise<Transcrip
   let latestTodos: TodoItem[] = [];
   const taskIdToIndex = new Map<string, number>();
   const queueCompletionMap = new Map<string, Date>();
+  // Background agents live in the Claude Code process: a startup/resume means
+  // the process that ran them is gone. Teammate agents report completion as an
+  // idle_notification message instead of a queue-operation.
+  let lastProcessStartAt: Date | undefined;
+  const teammateIdle: Array<{ name: string; at: Date }> = [];
   let latestSlug: string | undefined;
   let customTitle: string | undefined;
   let latestAdvisorModel: string | undefined;
@@ -724,6 +731,21 @@ export async function parseTranscript(transcriptPath: string): Promise<Transcrip
             prevMainChainAt = entryAt;
           }
         }
+        const entryAt = entry.timestamp ? new Date(entry.timestamp) : null;
+        if (entryAt && !Number.isNaN(entryAt.getTime())) {
+          // `compact`/`clear` fire SessionStart inside the same process, so only
+          // these two mean the background agents died with the old process.
+          const hookName = entry.attachment?.hookName;
+          if (entry.type === 'attachment' && (hookName === 'SessionStart:startup' || hookName === 'SessionStart:resume')) {
+            lastProcessStartAt = entryAt;
+          }
+          const content = entry.message?.content;
+          if (entry.type === 'user' && typeof content === 'string' && content.includes('<teammate-message')) {
+            for (const m of content.matchAll(/<teammate-message teammate_id="([^"]+)"[^>]*>([\s\S]*?)<\/teammate-message>/g)) {
+              if (m[2].includes('"idle_notification"')) teammateIdle.push({ name: m[1], at: entryAt });
+            }
+          }
+        }
         processEntry(entry, toolMap, skillSet, mcpServerSet, mcpErrorSet, agentMap, taskIdToIndex, latestTodos, result);
       } catch (err) {
         lastUsageKey = undefined;
@@ -744,6 +766,24 @@ export async function parseTranscript(transcriptPath: string): Promise<Transcrip
     if (agent?.background) {
       agent.endTime = endTime;
       agent.status = 'completed';
+    }
+  }
+  // ponytail: a teammate woken again by SendMessage after going idle shows as
+  // completed until its next idle; tracking wake-ups needs the SendMessage calls.
+  for (const { name, at } of teammateIdle) {
+    for (const agent of agentMap.values()) {
+      if (agent.background && agent.status === 'running' && agent.name === name && agent.startTime <= at) {
+        agent.endTime = at;
+        agent.status = 'completed';
+      }
+    }
+  }
+  if (lastProcessStartAt) {
+    for (const agent of agentMap.values()) {
+      if (agent.background && agent.status === 'running' && agent.startTime < lastProcessStartAt) {
+        agent.endTime = lastProcessStartAt;
+        agent.status = 'completed';
+      }
     }
   }
   for (const agent of agentMap.values()) {
@@ -842,6 +882,7 @@ function processEntry(
           type: (input?.subagent_type as string) ?? 'agent',
           model: sanitizeTranscriptModel(input?.model),
           description: (input?.description as string) ?? undefined,
+          name: typeof input?.name === 'string' ? input.name : undefined,
           status: 'running',
           startTime: timestamp,
           background: (input?.run_in_background as boolean) === true,
