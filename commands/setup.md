@@ -136,9 +136,9 @@ mkdir -p ~/.cache/tmp && TMPDIR=~/.cache/tmp claude /plugin install claude-hud
    POSIX character class supported by both BSD grep (macOS default) and
    GNU grep (Linux default).
 
-   Add `--env-file /dev/null` to prevent Bun from auto-loading project `.env` files:
+   Add `--config=/dev/null` and `--env-file /dev/null` so Bun ignores the current project's `bunfig.toml` (a `preload` there would print into the statusline) and its `.env` files:
    ```
-   bash -c 'cols=${COLUMNS:-}; case "$cols" in ""|*[!0-9]*) cols=$(stty size 2>/dev/null </dev/tty | awk '"'"'{print $2}'"'"');; esac; case "$cols" in ""|*[!0-9]*) cols=120;; esac; export COLUMNS=$(( cols > 4 ? cols - 4 : 1 )); plugin_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/claude-hud/*/ 2>/dev/null | awk -F/ '"'"'{ print $(NF-1) "\t" $(0) }'"'"' | grep -E '"'"'^[0-9]+\.[0-9]+\.[0-9]+[[:space:]]'"'"' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-); exec "{RUNTIME_PATH}" --env-file /dev/null "${plugin_dir}{SOURCE}"'
+   bash -c 'cols=${COLUMNS:-}; case "$cols" in ""|*[!0-9]*) cols=$(stty size 2>/dev/null </dev/tty | awk '"'"'{print $2}'"'"');; esac; case "$cols" in ""|*[!0-9]*) cols=120;; esac; export COLUMNS=$(( cols > 4 ? cols - 4 : 1 )); plugin_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/claude-hud/*/ 2>/dev/null | awk -F/ '"'"'{ print $(NF-1) "\t" $(0) }'"'"' | grep -E '"'"'^[0-9]+\.[0-9]+\.[0-9]+[[:space:]]'"'"' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-); exec "{RUNTIME_PATH}" --config=/dev/null --env-file /dev/null "${plugin_dir}{SOURCE}"'
    ```
 
 **WSL (Windows Subsystem for Linux)**: Windows users must run Claude Code inside WSL and use the macOS/Linux instructions above. Ensure the plugin is installed in the Linux environment (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/...`), not the Windows side.
@@ -164,7 +164,7 @@ EXISTING_COMMAND=""
 EXISTING_COMMAND_PREVIEW=""
 
 if [ -f "$SETTINGS" ]; then
-  EXISTING_COMMAND=$("{RUNTIME_PATH}" -e '
+  EXISTING_COMMAND=$("{RUNTIME_PATH}" --config=/dev/null -e '
 const fs = require("fs");
 const settingsPath = process.argv[1];
 
@@ -183,7 +183,7 @@ try {
 }
 ' "$SETTINGS") || exit 1
 
-  EXISTING_COMMAND_PREVIEW=$(printf '%s' "$EXISTING_COMMAND" | "{RUNTIME_PATH}" -e '
+  EXISTING_COMMAND_PREVIEW=$(printf '%s' "$EXISTING_COMMAND" | "{RUNTIME_PATH}" --config=/dev/null -e '
 let value = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", chunk => { value += chunk; });
