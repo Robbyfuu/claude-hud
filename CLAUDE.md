@@ -9,11 +9,12 @@ Claude HUD is a Claude Code plugin that displays a real-time multi-line statusli
 ## Build Commands
 
 ```bash
-npm ci               # Install dependencies
-npm run build        # Build TypeScript to dist/
+bun install          # Install dependencies
+bun run typecheck    # Type-check (no build step; Bun runs src/ directly)
+bun test             # Run the test suite
 
 # Test with sample stdin data
-echo '{"model":{"display_name":"Opus"},"context_window":{"current_usage":{"input_tokens":45000},"context_window_size":200000}}' | node dist/index.js
+echo '{"model":{"display_name":"Opus"},"context_window":{"current_usage":{"input_tokens":45000},"context_window_size":200000}}' | bun --env-file /dev/null src/index.ts
 ```
 
 ## Architecture
@@ -61,7 +62,7 @@ Claude Code → stdin JSON → parse → render lines → stdout → Claude Code
 
 ```
 src/
-├── index.ts             # Entry point
+├── index.ts             # Entry point (run directly by Bun)
 ├── stdin.ts             # Parse Claude's JSON input
 ├── transcript.ts        # Parse transcript JSONL
 ├── subagents.ts         # Per-subagent detail from <session>/subagents/*.jsonl (panel layout)
@@ -144,5 +145,9 @@ Note: `statusLine` is NOT a valid plugin.json field. It must be configured in se
 
 ## Dependencies
 
-- **Runtime**: Node.js 18+ or Bun
-- **Build**: TypeScript 5, ES2022 target, NodeNext modules
+- **Runtime**: Bun 1.4+
+- **Typecheck**: TypeScript 5, ES2022 target, NodeNext modules
+
+## Upstream sync
+
+Merges from `jarrodwatts/claude-hud` will conflict in `package.json`, `package-lock.json`, `dist/`, the workflows and `commands/setup.md`. Resolution: keep ours for those files; take upstream for `src/`; rewrite `../dist/` → `../src/` in any new upstream test; re-run `bun install` to refresh `bun.lock`.

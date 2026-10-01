@@ -473,8 +473,7 @@ CLAUDE_HUD_DISABLE=1 claude
 ## 运行环境要求
 
 - Claude Code v1.0.80+
-- macOS/Linux：Node.js 18+ 或 Bun
-- Windows：Node.js 18+
+- Bun 1.4+（macOS/Linux；Windows 请使用 WSL）
 
 ---
 
@@ -483,8 +482,7 @@ CLAUDE_HUD_DISABLE=1 claude
 ```bash
 git clone https://github.com/jarrodwatts/claude-hud
 cd claude-hud
-npm ci && npm run build
-npm test
+bun install && bun test
 ```
 
 详见 [CONTRIBUTING.md](CONTRIBUTING.md)。

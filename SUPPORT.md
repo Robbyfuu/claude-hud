@@ -6,7 +6,7 @@ This project is maintained on a best-effort basis.
 
 - The latest release
 - Claude Code versions documented in `README.md`
-- Node.js 18+ or Bun
+- Bun 1.4+ (Windows via WSL)
 
 ## How to Get Help
 

@@ -39,30 +39,32 @@ This project is small, runs in a terminal, and is mostly deterministic. The test
 ## Running Tests Locally
 
 ```bash
-npm test
+bun test
 ```
 
-This runs `npm run build` and then executes Node's built-in test runner.
+This runs the suite with Bun's test runner directly from `src/`; there is no build step.
 
 To generate coverage:
 
 ```bash
-npm run test:coverage
+bun run test:coverage
 ```
+
+Coverage is native to Bun (`bun test --coverage`).
 
 To update snapshots:
 
 ```bash
-npm run test:update-snapshots
+bun run test:update-snapshots
 ```
 
 ## CI Gate (recommended)
 
-- `npm ci`
-- `npm run build`
-- `npm test`
+- `bun install --frozen-lockfile`
+- `bun run typecheck`
+- `bun test`
 
-The provided GitHub Actions workflow runs `npm run test:coverage` on Node 18 and 20.
+The provided GitHub Actions workflow runs `bun run test:coverage` on the latest Bun 1.x.
 
 These steps should be required in PR checks to ensure new changes do not regress existing behavior.
 

@@ -64,17 +64,6 @@ Then run `/reload-plugins` inside your session (or start a new one).
 /claude-hud:setup
 ```
 
-<details>
-<summary><strong>⚠️ Windows users: Click here if setup says no JavaScript runtime was found</strong></summary>
-
-On Windows, Node.js LTS is the supported runtime for Claude HUD setup. If setup says no JavaScript runtime was found, install Node.js for your shell first:
-```powershell
-winget install OpenJS.NodeJS.LTS
-```
-Then restart your shell and run `/claude-hud:setup` again.
-
-</details>
-
 Done! Claude Code reloads settings automatically — the HUD appears after your next message, no restart needed. If it doesn't show up, restart Claude Code (older versions require a restart to pick up statusLine changes).
 
 ---
@@ -554,8 +543,7 @@ Leaving it unset (or setting an explicit negative: `0`, `false`, `off`, `no`) ke
 ## Requirements
 
 - Claude Code v1.0.80+
-- macOS/Linux: Node.js 18+ or Bun
-- Windows: Node.js 18+
+- Bun 1.4+ on macOS/Linux (Windows: use WSL)
 
 ---
 
@@ -564,8 +552,7 @@ Leaving it unset (or setting an explicit negative: `0`, `false`, `off`, `no`) ke
 ```bash
 git clone https://github.com/jarrodwatts/claude-hud
 cd claude-hud
-npm ci && npm run build
-npm test
+bun install && bun test
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
