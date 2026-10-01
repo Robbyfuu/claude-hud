@@ -8,14 +8,6 @@ import { DEFAULT_CONFIG } from "../src/config.js";
 import { setLanguage } from "../src/i18n/index.js";
 import { formatSessionDuration, main, resolveVcsStatus } from "../src/index.js";
 
-function restoreEnvVar(name, value) {
-  if (value === undefined) {
-    delete process.env[name];
-    return;
-  }
-  process.env[name] = value;
-}
-
 function makeConfig(overrides = {}) {
   return {
     ...DEFAULT_CONFIG,
@@ -159,7 +151,10 @@ test("index entrypoint runs when executed directly", async () => {
       env: { ...process.env, CLAUDE_CONFIG_DIR: dir },
       input: "",
       encoding: "utf8",
+      timeout: 10_000,
     });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.status, 0, result.stderr || "non-zero exit");
     assert.ok(result.stdout.includes("[claude-hud] Initializing..."), result.stderr);
   } finally {
     await cleanup();
