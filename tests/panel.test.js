@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { renderPanel, selectPanelAgents } from '../dist/render/panel.js';
@@ -309,6 +309,38 @@ test('readSubagentDetails maps agents to transcripts through meta.json toolUseId
     assert.deepEqual(details.get('toolu_spawn').skills, ['testing-strategy']);
     assert.deepEqual(details.get('toolu_spawn').currentTool, { name: 'Read', target: 'kids.e2e-spec.ts' });
     assert.equal(details.get('toolu_unknown').toolCount, 0);
+  });
+});
+
+test('readSubagentDetails maps background teammates through meta.json name', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    // Teammate metas carry no toolUseId; the Agent `name` input is the only link.
+    await writeJsonl(path.join(subagentsDir, 'agent-ak3-t5-old.jsonl'), [
+      toolUse('o1', 'Grep', { pattern: 'stale' }),
+    ]);
+    await writeFile(
+      path.join(subagentsDir, 'agent-ak3-t5-old.meta.json'),
+      JSON.stringify({ agentType: 'k3-t5', name: 'k3-t5', taskKind: 'in_process_teammate' }),
+    );
+    const older = new Date(Date.now() - 60_000);
+    await utimes(path.join(subagentsDir, 'agent-ak3-t5-old.meta.json'), older, older);
+    await writeJsonl(path.join(subagentsDir, 'agent-ak3-t5-new.jsonl'), [
+      toolUse('s1', 'Skill', { skill: 'tdd' }),
+      toolResult('s1'),
+      toolUse('s2', 'Edit', { file_path: '/p/src/monthly-days.service.ts' }),
+    ]);
+    await writeFile(
+      path.join(subagentsDir, 'agent-ak3-t5-new.meta.json'),
+      JSON.stringify({ agentType: 'k3-t5', name: 'k3-t5', taskKind: 'in_process_teammate' }),
+    );
+    const details = readSubagentDetails(transcriptPath, [
+      { id: 'toolu_spawn', type: 'nestjs-developer', name: 'k3-t5', status: 'running', startTime: new Date() },
+    ], dir);
+    assert.deepEqual(details.get('toolu_spawn').skills, ['tdd']);
+    assert.deepEqual(details.get('toolu_spawn').currentTool, { name: 'Edit', target: 'monthly-days.service.ts' });
   });
 });
 

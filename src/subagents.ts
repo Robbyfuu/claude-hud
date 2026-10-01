@@ -70,9 +70,16 @@ export function getSubagentsDir(transcriptPath: string): string {
   return path.join(dir, sessionId, 'subagents');
 }
 
-/** Maps spawning tool_use ids to subagent transcript paths. */
+const teammateKey = (name: string): string => `name:${name}`;
+
+/**
+ * Maps spawning tool_use ids to subagent transcript paths. Background teammates'
+ * metas carry no toolUseId, so they are keyed by teammate name instead; when a
+ * name was reused, the most recently spawned meta wins.
+ */
 export function readSubagentIndex(subagentsDir: string): Map<string, string> {
   const index = new Map<string, string>();
+  const teammateSpawnedAt = new Map<string, number>();
   let entries: string[];
   try {
     entries = fs.readdirSync(subagentsDir);
@@ -85,9 +92,18 @@ export function readSubagentIndex(subagentsDir: string): Map<string, string> {
     if (!name.endsWith('.meta.json')) continue;
     if (++seen > MAX_META_FILES) break;
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(subagentsDir, name), 'utf8')) as { toolUseId?: unknown };
+      const metaPath = path.join(subagentsDir, name);
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { toolUseId?: unknown; name?: unknown };
+      const transcript = path.join(subagentsDir, name.replace(/\.meta\.json$/, '.jsonl'));
       if (typeof meta.toolUseId === 'string' && meta.toolUseId) {
-        index.set(meta.toolUseId, path.join(subagentsDir, name.replace(/\.meta\.json$/, '.jsonl')));
+        index.set(meta.toolUseId, transcript);
+      } else if (typeof meta.name === 'string' && meta.name) {
+        const key = teammateKey(meta.name);
+        const spawnedAt = fs.statSync(metaPath).mtimeMs;
+        if (spawnedAt >= (teammateSpawnedAt.get(key) ?? -Infinity)) {
+          teammateSpawnedAt.set(key, spawnedAt);
+          index.set(key, transcript);
+        }
       }
     } catch (err) {
       debug('Skipping unreadable subagent meta %s:', name, err instanceof Error ? err.message : err);
@@ -429,7 +445,7 @@ export function readSubagentDetails(
   const definitionSkills = new Map<string, string[]>();
 
   for (const agent of agents) {
-    const file = index.get(agent.id);
+    const file = index.get(agent.id) ?? (agent.name ? index.get(teammateKey(agent.name)) : undefined);
     const parsed = file ? parseSubagentTranscript(file) : null;
     const detail: SubagentDetail = parsed ?? { skills: [], todosDone: 0, todosTotal: 0, toolCount: 0 };
 

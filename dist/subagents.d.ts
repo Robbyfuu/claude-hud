@@ -1,6 +1,10 @@
 import type { AgentEntry, SubagentDetail } from './types.js';
 export declare function getSubagentsDir(transcriptPath: string): string;
-/** Maps spawning tool_use ids to subagent transcript paths. */
+/**
+ * Maps spawning tool_use ids to subagent transcript paths. Background teammates'
+ * metas carry no toolUseId, so they are keyed by teammate name instead; when a
+ * name was reused, the most recently spawned meta wins.
+ */
 export declare function readSubagentIndex(subagentsDir: string): Map<string, string>;
 export declare function describeToolTarget(toolName: string, input?: Record<string, unknown>): string | undefined;
 /** Parses one subagent transcript into the detail the panel shows. */
