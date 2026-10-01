@@ -20,6 +20,18 @@ test('setup only offers the Bun runtime', async () => {
   assert.match(setup, /WSL/);
 });
 
+test('setup runs Bun without project bunfig.toml or .env', async () => {
+  const setup = await readFile(new URL('../commands/setup.md', import.meta.url), 'utf8');
+  const runs = setup.match(/"\{RUNTIME_PATH\}" [^\n']*/g) ?? [];
+
+  assert.equal(runs.length, 3, 'statusLine command plus the two settings.json readers');
+  for (const run of runs) {
+    // A project's bunfig.toml preload would otherwise print into the statusline.
+    assert.match(run, /^"\{RUNTIME_PATH\}" --config=\/dev\/null /, run);
+  }
+  assert.match(setup, /exec "\{RUNTIME_PATH\}" --config=\/dev\/null --env-file \/dev\/null /);
+});
+
 test('setup gates Windows before Step 0', async () => {
   const setup = await readFile(new URL('../commands/setup.md', import.meta.url), 'utf8');
 
