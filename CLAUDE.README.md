@@ -113,7 +113,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
 <requirements>
   <runtime>Bun 1.4+</runtime>
   <claude_code>v1.0.80 or later</claude_code>
-  <build>TypeScript 5, ES2022 target, NodeNext modules</build>
+  <typecheck>TypeScript 7 (type-check only), ES2022 target, NodeNext modules</typecheck>
 </requirements>
 
 <architecture>
@@ -262,7 +262,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
 
 <development>
   <setup>
-    git clone https://github.com/jarrodwatts/claude-hud
+    git clone https://github.com/Robbyfuu/claude-hud
     cd claude-hud
     bun install
   </setup>

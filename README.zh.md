@@ -469,7 +469,7 @@ CLAUDE_HUD_DISABLE=1 claude
 ## 开发
 
 ```bash
-git clone https://github.com/jarrodwatts/claude-hud
+git clone https://github.com/Robbyfuu/claude-hud
 cd claude-hud
 bun install && bun test
 ```

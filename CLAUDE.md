@@ -146,8 +146,8 @@ Note: `statusLine` is NOT a valid plugin.json field. It must be configured in se
 ## Dependencies
 
 - **Runtime**: Bun 1.4+
-- **Typecheck**: TypeScript 5, ES2022 target, NodeNext modules
+- **Typecheck**: TypeScript 7 (type-check only), ES2022 target, NodeNext modules
 
 ## Upstream sync
 
-Merges from `jarrodwatts/claude-hud` will conflict in `package.json`, `package-lock.json`, `dist/`, the workflows and `commands/setup.md`. Resolution: keep ours for those files; take upstream for `src/`; rewrite `../dist/` → `../src/` in any new upstream test; re-run `bun install` to refresh `bun.lock`.
+Merges from `jarrodwatts/claude-hud` will conflict in `package.json`, `package-lock.json`, `dist/`, the workflows and `commands/setup.md`. Resolution: keep ours for those files; take upstream for `src/`; rewrite `../dist/` → `../src/` in any new upstream test; re-run `bun install` to refresh `bun.lock`. When taking upstream `src/`, keep our `getHomeDir()` (from `src/claude-config-dir.ts`) and `if (import.meta.main)` entrypoint in conflicting hunks; replace any new upstream `os.homedir()` call with `getHomeDir()` (Bun caches HOME at startup); and rewrite any new upstream test that spawns the built `dist/index.js` through Node to `spawnSync(process.execPath, ["src/index.ts"], …)`.

@@ -550,7 +550,7 @@ Leaving it unset (or setting an explicit negative: `0`, `false`, `off`, `no`) ke
 ## Development
 
 ```bash
-git clone https://github.com/jarrodwatts/claude-hud
+git clone https://github.com/Robbyfuu/claude-hud
 cd claude-hud
 bun install && bun test
 ```

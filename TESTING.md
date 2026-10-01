@@ -64,7 +64,7 @@ bun run test:update-snapshots
 - `bun run typecheck`
 - `bun test`
 
-The provided GitHub Actions workflow runs `bun run test:coverage` on the latest Bun 1.x.
+The provided GitHub Actions workflow runs `bun run test:coverage` on the Bun version pinned in `package.json` (`packageManager`, currently 1.4.2).
 
 These steps should be required in PR checks to ensure new changes do not regress existing behavior.
 
