@@ -9,6 +9,7 @@ import {
   readAgentDefinitionSkills,
   readSubagentDetails,
   getSubagentsDir,
+  readSubagentTokenTotals,
 } from '../dist/subagents.js';
 import { parseTranscript } from '../dist/transcript.js';
 import { mergeConfig } from '../dist/config.js';
@@ -182,6 +183,119 @@ test('renderPanel flags a critical context with /compact and handles missing dat
   assert.ok(!plain.some((l) => l.includes('AGENT')));
 });
 
+const statsLine = (ctx) => renderPanel(ctx, 154).map(stripAnsi).find((l) => l.includes('$4.82'));
+
+test('renderPanel shows the session token total and cache share between cost and lines', () => {
+  setLanguage('en');
+  const ctx = makeCtx();
+  ctx.transcript.sessionTokens = { inputTokens: 10_000, outputTokens: 40_000, cacheCreationTokens: 50_000, cacheReadTokens: 900_000 };
+  assert.match(statsLine(ctx), /\$4\.82 · 1M tok \(90% cache\) · \+312 −48/);
+});
+
+test('renderPanel adds subagent tokens to the session total and cache share', () => {
+  setLanguage('en');
+  const ctx = makeCtx({
+    subagentTokens: { inputTokens: 0, outputTokens: 100_000, cacheCreationTokens: 0, cacheReadTokens: 400_000 },
+  });
+  ctx.transcript.sessionTokens = { inputTokens: 10_000, outputTokens: 40_000, cacheCreationTokens: 50_000, cacheReadTokens: 900_000 };
+  assert.match(statsLine(ctx), /\$4\.82 · 1\.5M tok \(87% cache\) · \+312/);
+});
+
+test('renderPanel omits the cache share when no tokens were read from cache', () => {
+  setLanguage('en');
+  const ctx = makeCtx();
+  ctx.transcript.sessionTokens = { inputTokens: 5_000, outputTokens: 7_000, cacheCreationTokens: 0, cacheReadTokens: 0 };
+  assert.match(statsLine(ctx), /\$4\.82 · 12k tok · \+312/);
+});
+
+test('renderPanel omits the token segment without token data', () => {
+  setLanguage('en');
+  assert.match(statsLine(makeCtx()), /\$4\.82 · \+312/);
+  const empty = makeCtx({ subagentTokens: null });
+  empty.transcript.sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+  assert.match(statsLine(empty), /\$4\.82 · \+312/);
+});
+
+// Session box rows between its top and bottom border (wide layout: boxes share lines).
+const topBoxRows = (plain) => plain.findIndex((l) => l.startsWith('╰')) - 1;
+const adviceCtx = (percent, warm, inputTokens = 10) => {
+  const ctx = makeCtx();
+  ctx.stdin.context_window.used_percentage = percent;
+  ctx.stdin.context_window.current_usage = { input_tokens: inputTokens };
+  ctx.stdin.prompt_cache = { warm, hit_ratio: 0.9 };
+  return ctx;
+};
+
+test('renderPanel shows no advice row below the thresholds with a warm cache', () => {
+  setLanguage('en');
+  const plain = renderPanel(adviceCtx(54, true, 659_000), 154).map(stripAnsi);
+  assert.equal(topBoxRows(plain), 4);
+  assert.ok(!plain.some((l) => l.includes('new session')));
+});
+
+test('renderPanel advises a new session in red at the critical context threshold', () => {
+  setLanguage('en');
+  const lines = renderPanel(adviceCtx(87, true), 154);
+  assert.ok(lines.some((l) => l.includes('\x1b[38;2;255;122;150m↻ new session · context 87%')));
+});
+
+test('renderPanel advises a new session in amber when a cold cache would rewrite a large context', () => {
+  setLanguage('en');
+  const lines = renderPanel(adviceCtx(54, false, 659_000), 154);
+  assert.ok(lines.some((l) => l.includes('\x1b[38;2;245;194;107m↻ new session · cold cache, rewrites 659k')));
+});
+
+test('renderPanel advises a new session soon in amber at the warning context threshold', () => {
+  setLanguage('en');
+  const lines = renderPanel(adviceCtx(72, true), 154);
+  assert.ok(lines.some((l) => l.includes('\x1b[38;2;245;194;107m↻ new session soon · context 72%')));
+});
+
+test('renderPanel shows only the highest-priority advice', () => {
+  setLanguage('en');
+  const advice = (ctx) => renderPanel(ctx, 154).map(stripAnsi).filter((l) => l.includes('↻ new session'));
+  const critical = advice(adviceCtx(90, false, 900_000));
+  assert.equal(critical.length, 1);
+  assert.match(critical[0], /↻ new session · context 90%/);
+  const cold = advice(adviceCtx(75, false, 750_000));
+  assert.equal(cold.length, 1);
+  assert.match(cold[0], /↻ new session · cold cache, rewrites 750k/);
+});
+
+test('renderPanel ignores a cold cache below 200k context tokens', () => {
+  setLanguage('en');
+  const plain = renderPanel(adviceCtx(54, false, 199_999), 154).map(stripAnsi);
+  assert.ok(!plain.some((l) => l.includes('new session')));
+  assert.equal(topBoxRows(plain), 4);
+});
+
+test('renderPanel only treats an explicit warm: false as a cold cache', () => {
+  setLanguage('en');
+  for (const warm of [null, undefined]) {
+    const plain = renderPanel(adviceCtx(54, warm, 659_000), 154).map(stripAnsi);
+    assert.ok(!plain.some((l) => l.includes('new session')), `warm: ${warm}`);
+  }
+});
+
+test('renderPanel grows every wide top box to fit the advice row', () => {
+  setLanguage('en');
+  const lines = renderPanel(adviceCtx(87, true), 154);
+  const widths = new Set(lines.map(visibleWidth));
+  assert.equal(widths.size, 1, `all lines share one width, got ${[...widths].join(', ')}`);
+  const plain = lines.map(stripAnsi);
+  assert.equal(topBoxRows(plain), 5);
+  assert.match(plain[6], /^╰─+╯ ╰─+╯ ╰─+╯$/);
+});
+
+test('renderPanel shows the advice row in medium and narrow layouts', () => {
+  setLanguage('en');
+  const medium = renderPanel(adviceCtx(87, true), 100);
+  assert.equal(new Set(medium.map(visibleWidth)).size, 1);
+  assert.ok(medium.map(stripAnsi).some((l) => l.includes('↻ new session · context 87%')));
+  const narrow = renderPanel(adviceCtx(87, true), 64).map(stripAnsi);
+  assert.ok(narrow.some((l) => l.includes('↻ new session · context 87%')));
+});
+
 test('renderPanel uses Nerd Font icons only when enabled', () => {
   const withIcons = renderPanel(makeCtx({ config: mergeConfig({ lineLayout: 'panel', panel: { icons: 'nerd' } }) }), 154).join('\n');
   const without = renderPanel(makeCtx(), 154).join('\n');
@@ -197,6 +311,22 @@ test('renderPanel speaks Spanish', () => {
     assert.match(plain, /╭─ consumo/);
     assert.match(plain, /AGENTE/);
     assert.match(plain, /1 activo · 1 listo/);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('renderPanel speaks Spanish in the token segment and advice row', () => {
+  setLanguage('es');
+  try {
+    const render = (ctx) => renderPanel(ctx, 154).map(stripAnsi).join('\n');
+    const critical = adviceCtx(87, true);
+    critical.transcript.sessionTokens = { inputTokens: 10_000, outputTokens: 40_000, cacheCreationTokens: 50_000, cacheReadTokens: 900_000 };
+    const plain = render(critical);
+    assert.match(plain, /1M tok \(90% caché\)/);
+    assert.match(plain, /↻ nueva sesión · contexto 87%/);
+    assert.match(render(adviceCtx(54, false, 659_000)), /↻ nueva sesión · caché fría, reescribe 659k/);
+    assert.match(render(adviceCtx(72, true)), /↻ nueva sesión pronto · contexto 72%/);
   } finally {
     setLanguage('en');
   }
@@ -341,6 +471,61 @@ test('readSubagentDetails maps background teammates through meta.json name', asy
     ], dir);
     assert.deepEqual(details.get('toolu_spawn').skills, ['tdd']);
     assert.deepEqual(details.get('toolu_spawn').currentTool, { name: 'Edit', target: 'monthly-days.service.ts' });
+  });
+});
+
+const usageLine = (id, input, output, cacheCreation, cacheRead) => ({
+  type: 'assistant',
+  message: {
+    id,
+    content: [],
+    usage: { input_tokens: input, output_tokens: output, cache_creation_input_tokens: cacheCreation, cache_read_input_tokens: cacheRead },
+  },
+});
+
+test('readSubagentTokenTotals sums token usage across subagent transcripts', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    await writeJsonl(path.join(subagentsDir, 'agent-a.jsonl'), [
+      usageLine('msg_a1', 10, 20, 30, 40),
+      usageLine('msg_a1', 10, 20, 30, 40), // dual-logged duplicate
+      usageLine('msg_a2', 1, 2, 3, 4),
+    ]);
+    await writeJsonl(path.join(subagentsDir, 'agent-b.jsonl'), [usageLine('msg_b1', 100, 200, 300, 400)]);
+    await mkdir(path.join(subagentsDir, 'agent-broken.jsonl'));
+    assert.deepEqual(await readSubagentTokenTotals(transcriptPath), {
+      inputTokens: 111,
+      outputTokens: 222,
+      cacheCreationTokens: 333,
+      cacheReadTokens: 444,
+    });
+  });
+});
+
+test('readSubagentTokenTotals returns null without subagent transcripts', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    assert.equal(await readSubagentTokenTotals(transcriptPath), null);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    await mkdir(subagentsDir, { recursive: true });
+    await writeFile(path.join(subagentsDir, 'agent-a.meta.json'), '{}');
+    assert.equal(await readSubagentTokenTotals(transcriptPath), null);
+  });
+});
+
+test('readSubagentTokenTotals ignores an empty transcript path instead of reading ./subagents', async () => {
+  await withTempDir(async (dir) => {
+    await writeJsonl(path.join(dir, 'subagents', 'agent-a.jsonl'), [usageLine('msg_1', 1, 1, 1, 1)]);
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      assert.equal(await readSubagentTokenTotals(''), null);
+    } finally {
+      process.chdir(cwd);
+    }
   });
 });
 

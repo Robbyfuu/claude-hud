@@ -255,4 +255,6 @@ export interface RenderContext {
   authInfo?: AuthInfo | null;
   // Subagent details keyed by the spawning tool_use id (panel layout only).
   subagents?: Map<string, SubagentDetail>;
+  // Token usage summed across every subagent transcript (panel layout only).
+  subagentTokens?: SessionTokenUsage | null;
 }
