@@ -203,7 +203,7 @@ fi
 
 ### 2.5.2: Classify the existing statusline
 
-If `EXISTING_COMMAND` / `$existingCommand` is non-empty, classify it:
+If `EXISTING_COMMAND` is non-empty, classify it:
 
 | Pattern in command | Classification | Source label |
 |---|---|---|
@@ -254,7 +254,7 @@ Set `{REDACTED_COMMAND_PREVIEW}` to `EXISTING_COMMAND_PREVIEW`. Use only the red
 
 **If the user chooses "Keep" or "Cancel"**: Stop setup. The backup from 2.5.3 is still available if one was created. Tell the user:
 
-> No changes were made to your settings. Your existing statusline is preserved. Setup created no settings mutation apart from the backup file at `{BACKUP_PATH or $backupPath}` if that value is set.
+> No changes were made to your settings. Your existing statusline is preserved. Setup created no settings mutation apart from the backup file at `{BACKUP_PATH}` if that value is set.
 
 **If the user chooses "Replace"**: Proceed to Step 3. The backup from 2.5.3 ensures the previous configuration can be restored.
 

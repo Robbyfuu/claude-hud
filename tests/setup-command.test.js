@@ -15,6 +15,7 @@ test('setup only offers the Bun runtime', async () => {
   assert.doesNotMatch(setup, /command -v node/);
   assert.doesNotMatch(setup, /dist\/index\.js/);
   assert.doesNotMatch(setup, /PowerShell/);
+  assert.doesNotMatch(setup, /\$env:|\$existingCommand|\$backupPath/);
   assert.match(setup, /command -v bun/);
   assert.match(setup, /WSL/);
 });
