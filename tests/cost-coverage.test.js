@@ -165,11 +165,11 @@ test('estimateSessionCost prices Claude 5 ids carrying a context-window suffix',
 test('estimateSessionCost prices Claude 5 point releases like their base model', () => {
   const tokens = { inputTokens: 1000000, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
 
-  const opus51 = estimateSessionCost({ model: { display_name: 'Opus 5.1' } }, tokens);
+  const opus51 = estimateSessionCost({ model: { display_name: 'Opus 5.1' } }, tokens, { now: new Date('2026-08-31T00:00:00.000Z') });
   assert.ok(opus51);
   assert.equal(opus51.inputUsd, 5);
 
-  const sonnet51 = estimateSessionCost({ model: { display_name: 'Sonnet 5.1' } }, tokens);
+  const sonnet51 = estimateSessionCost({ model: { display_name: 'Sonnet 5.1' } }, tokens, { now: new Date('2026-08-31T00:00:00.000Z') });
   assert.ok(sonnet51);
   assert.equal(sonnet51.inputUsd, 2);
 });
