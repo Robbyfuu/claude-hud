@@ -1,8 +1,7 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
-import { getHudPluginDir } from "./claude-config-dir.js";
+import { getHomeDir, getHudPluginDir } from "./claude-config-dir.js";
 import { createDebug } from "./debug.js";
 import type { StdinData } from "./types.js";
 
@@ -48,7 +47,7 @@ export type ContextCacheDeps = {
 };
 
 const defaultDeps: ContextCacheDeps = {
-  homeDir: () => os.homedir(),
+  homeDir: () => getHomeDir(),
   now: () => Date.now(),
   random: () => Math.random(),
 };

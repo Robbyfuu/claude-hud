@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
-import { getClaudeConfigDir, getHudPluginDir } from './claude-config-dir.js';
+import { getClaudeConfigDir, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { createDebug } from './debug.js';
 import type { Language } from './i18n/types.js';
 import { MAX_TERMINAL_WIDTH } from './utils/terminal.js';
@@ -418,7 +417,7 @@ export const DEFAULT_CONFIG: HudConfig = {
 };
 
 export function getConfigPath(): string {
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   return path.join(getHudPluginDir(homeDir), 'config.json');
 }
 
@@ -432,7 +431,7 @@ export function getConfigPath(): string {
  * can override any part of the shared config.
  */
 export function getConfigOverridePath(): string {
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   return path.join(getClaudeConfigDir(homeDir), 'claude-hud.json');
 }
 

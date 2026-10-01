@@ -1,9 +1,8 @@
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { getHudPluginDir } from './claude-config-dir.js';
+import { getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { createDebug } from './debug.js';
 
 const debug = createDebug('version');
@@ -234,7 +233,7 @@ export function _getClaudeVersionInvocation(
 }
 
 export async function getClaudeCodeVersion(): Promise<string | undefined> {
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   const diskCache = readVersionCache(homeDir);
   if (diskCache) {
     const cachedBinaryInfo = statResolvedBinary(diskCache.binaryPath);

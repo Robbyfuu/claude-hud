@@ -1,8 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import type { AgentEntry, SessionTokenUsage, SubagentDetail } from './types.js';
-import { getClaudeConfigDir } from './claude-config-dir.js';
+import { getClaudeConfigDir, getHomeDir } from './claude-config-dir.js';
 import { parseTranscript } from './transcript.js';
 import { sanitizeDisplayText } from './utils/sanitize.js';
 import { createDebug } from './debug.js';
@@ -364,7 +363,7 @@ function listMarkdownFiles(dir: string, budget: { left: number }, depth = 0): st
 }
 
 function agentDefinitionDirs(cwd: string | undefined, pluginName: string | undefined): string[] {
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   const claudeDir = getClaudeConfigDir(homeDir);
   const dirs: string[] = [];
 

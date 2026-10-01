@@ -20,8 +20,6 @@ import type { GitStatus } from "./git.js";
 import type { HudConfig } from "./config.js";
 
 export { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from "./external-usage.js";
-import { fileURLToPath } from "node:url";
-import { realpathSync } from "node:fs";
 
 export type MainDeps = {
   readStdin: typeof readStdin;
@@ -260,15 +258,6 @@ export function formatSessionDuration(
   return `${hours}h ${remainingMins}m`;
 }
 
-const scriptPath = fileURLToPath(import.meta.url);
-const argvPath = process.argv[1];
-const isSamePath = (a: string, b: string): boolean => {
-  try {
-    return realpathSync(a) === realpathSync(b);
-  } catch {
-    return a === b;
-  }
-};
-if (argvPath && isSamePath(argvPath, scriptPath)) {
+if (import.meta.main) {
   void main();
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { DEFAULT_CONFIG } from "../src/config.js";
 import { setLanguage } from "../src/i18n/index.js";
 import { formatSessionDuration, main, resolveVcsStatus } from "../src/index.js";
@@ -152,37 +152,18 @@ test("main logs unknown error for non-Error throws", async () => {
 });
 
 test("index entrypoint runs when executed directly", async () => {
-  const originalArgv = [...process.argv];
-  const originalIsTTY = process.stdin.isTTY;
-  const originalLog = console.log;
-  const originalConfigDir = process.env.CLAUDE_CONFIG_DIR;
-  const logs = [];
   const { dir, cleanup } = await createTempConfigDir({ language: "en" });
 
   try {
-    process.env.CLAUDE_CONFIG_DIR = dir;
-    setLanguage("en");
-    const moduleUrl = new URL("../src/index.js", import.meta.url);
-    process.argv[1] = fileURLToPath(moduleUrl);
-    Object.defineProperty(process.stdin, "isTTY", {
-      value: true,
-      configurable: true,
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
+      env: { ...process.env, CLAUDE_CONFIG_DIR: dir },
+      input: "",
+      encoding: "utf8",
     });
-    console.log = (...args) => logs.push(args.join(" "));
-    await import(`${moduleUrl}?entry=${Date.now()}`);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.ok(result.stdout.includes("[claude-hud] Initializing..."), result.stderr);
   } finally {
-    console.log = originalLog;
-    process.argv = originalArgv;
-    restoreEnvVar("CLAUDE_CONFIG_DIR", originalConfigDir);
-    Object.defineProperty(process.stdin, "isTTY", {
-      value: originalIsTTY,
-      configurable: true,
-    });
     await cleanup();
   }
-
-  assert.ok(logs.some((line) => line.includes("[claude-hud] Initializing...")));
 });
 
 test("main executes the happy path", async () => {

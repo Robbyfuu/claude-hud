@@ -1,4 +1,10 @@
+import * as os from 'node:os';
 import * as path from 'node:path';
+
+// Bun's os.homedir() caches HOME at startup, so read the env var at call time.
+export function getHomeDir(): string {
+  return process.env.HOME || os.homedir();
+}
 
 function expandHomeDirPrefix(inputPath: string, homeDir: string): string {
   if (inputPath === '~') {

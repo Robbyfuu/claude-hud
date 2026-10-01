@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
-import { getHudPluginDir } from './claude-config-dir.js';
+import { getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { getNativeCostUsd } from './cost.js';
 import { createDebug } from './debug.js';
 import type { StdinData } from './types.js';
@@ -48,7 +47,7 @@ export type DailyCostDeps = {
 };
 
 const defaultDeps: DailyCostDeps = {
-  homeDir: () => os.homedir(),
+  homeDir: () => getHomeDir(),
   now: () => Date.now(),
 };
 
