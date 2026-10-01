@@ -8,7 +8,7 @@ import {
   getDailyCostUsd,
   getDailyCostLedgerPath,
   DAILY_COST_WRITE_THROTTLE_MS,
-} from '../dist/daily-cost.js';
+} from '../src/daily-cost.js';
 
 const originalConfigDir = process.env.CLAUDE_CONFIG_DIR;
 let homeDir;

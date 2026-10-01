@@ -4,9 +4,9 @@ import { access, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
-import { DEFAULT_CONFIG } from '../dist/config.js';
-import { getUsageFromStdin } from '../dist/stdin.js';
-import { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from '../dist/external-usage.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
+import { getUsageFromStdin } from '../src/stdin.js';
+import { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from '../src/external-usage.js';
 
 async function withTempFile(content) {
   const dir = await mkdtemp(path.join(tmpdir(), 'claude-hud-external-usage-'));

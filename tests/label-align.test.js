@@ -1,12 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { setLanguage } from "../dist/i18n/index.js";
+import { setLanguage } from "../src/i18n/index.js";
 import {
   paddedLabel,
   progressLabel,
   _plainTextWidth,
   _maxLabelWidth,
-} from "../dist/render/lines/label-align.js";
+} from "../src/render/lines/label-align.js";
 
 // Strip ANSI escape sequences for content inspection.
 function stripAnsi(str) {

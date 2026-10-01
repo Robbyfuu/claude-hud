@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderSessionTimeLine } from '../dist/render/lines/session-time.js';
-import { setLanguage } from '../dist/i18n/index.js';
+import { renderSessionTimeLine } from '../src/render/lines/session-time.js';
+import { setLanguage } from '../src/i18n/index.js';
 
 function makeCtx(overrides = {}) {
   return {

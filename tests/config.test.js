@@ -9,7 +9,7 @@ import {
   DEFAULT_ELEMENT_ORDER,
   DEFAULT_MERGE_GROUPS,
   DEFAULT_PROJECT_LINE_ORDER,
-} from '../dist/config.js';
+} from '../src/config.js';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';

@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { renderPanel, selectPanelAgents } from '../dist/render/panel.js';
+import { renderPanel, selectPanelAgents } from '../src/render/panel.js';
 import {
   parseSubagentTranscript,
   readAgentDefinitionSkills,
   readSubagentDetails,
   getSubagentsDir,
   readSubagentTokenTotals,
-} from '../dist/subagents.js';
-import { parseTranscript } from '../dist/transcript.js';
-import { mergeConfig } from '../dist/config.js';
-import { setLanguage, t } from '../dist/i18n/index.js';
-import { en } from '../dist/i18n/en.js';
-import { es } from '../dist/i18n/es.js';
+} from '../src/subagents.js';
+import { parseTranscript } from '../src/transcript.js';
+import { mergeConfig } from '../src/config.js';
+import { setLanguage, t } from '../src/i18n/index.js';
+import { en } from '../src/i18n/en.js';
+import { es } from '../src/i18n/es.js';
 
 function stripAnsi(str) {
   // eslint-disable-next-line no-control-regex

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderPromptCacheLine } from '../dist/render/lines/prompt-cache.js';
-import { setLanguage } from '../dist/i18n/index.js';
+import { renderPromptCacheLine } from '../src/render/lines/prompt-cache.js';
+import { setLanguage } from '../src/i18n/index.js';
 
 function stripAnsi(str) {
   // eslint-disable-next-line no-control-regex

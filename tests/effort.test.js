@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { resolveEffortLevel } from '../dist/effort.js';
+import { resolveEffortLevel } from '../src/effort.js';
 
 describe('resolveEffortLevel', () => {
   describe('stdin effort (future Claude Code support)', () => {

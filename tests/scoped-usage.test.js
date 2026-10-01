@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getUsageFromStdin } from '../dist/stdin.js';
-import { renderUsageLine } from '../dist/render/lines/usage.js';
-import { renderSessionLine } from '../dist/render/session-line.js';
+import { getUsageFromStdin } from '../src/stdin.js';
+import { renderUsageLine } from '../src/render/lines/usage.js';
+import { renderSessionLine } from '../src/render/session-line.js';
 
 // Model-scoped weekly windows (rate_limits.model_scoped) — additive stdin field.
 // Upstream schema: { display_name, utilization (0-100 percent), resets_at (ISO-8601) }.

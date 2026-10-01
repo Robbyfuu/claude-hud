@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { _setCreateReadStreamForTests, parseTranscript } from '../dist/transcript.js';
-import { TRANSCRIPT_MODEL_MAX_LEN } from '../dist/model-source.js';
-import { countConfigs } from '../dist/config-reader.js';
-import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, getUsageFromStdin, isBedrockModelId, stripContextSuffix, formatModelName, resolveModelName } from '../dist/stdin.js';
-import { estimateSessionCost, resolveSessionCost, formatUsd } from '../dist/cost.js';
+import { _setCreateReadStreamForTests, parseTranscript } from '../src/transcript.js';
+import { TRANSCRIPT_MODEL_MAX_LEN } from '../src/model-source.js';
+import { countConfigs } from '../src/config-reader.js';
+import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, getUsageFromStdin, isBedrockModelId, stripContextSuffix, formatModelName, resolveModelName } from '../src/stdin.js';
+import { estimateSessionCost, resolveSessionCost, formatUsd } from '../src/cost.js';
 import * as fs from 'node:fs';
 
 function restoreEnvVar(name, value) {

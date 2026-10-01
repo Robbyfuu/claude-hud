@@ -4,9 +4,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_CONFIG } from "../dist/config.js";
-import { setLanguage } from "../dist/i18n/index.js";
-import { formatSessionDuration, main, resolveVcsStatus } from "../dist/index.js";
+import { DEFAULT_CONFIG } from "../src/config.js";
+import { setLanguage } from "../src/i18n/index.js";
+import { formatSessionDuration, main, resolveVcsStatus } from "../src/index.js";
 
 function restoreEnvVar(name, value) {
   if (value === undefined) {
@@ -162,7 +162,7 @@ test("index entrypoint runs when executed directly", async () => {
   try {
     process.env.CLAUDE_CONFIG_DIR = dir;
     setLanguage("en");
-    const moduleUrl = new URL("../dist/index.js", import.meta.url);
+    const moduleUrl = new URL("../src/index.js", import.meta.url);
     process.argv[1] = fileURLToPath(moduleUrl);
     Object.defineProperty(process.stdin, "isTTY", {
       value: true,

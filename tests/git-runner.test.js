@@ -12,8 +12,8 @@ import {
   resolveTaskkillPath,
   resolveWindowsGitExecutable,
   terminateWindowsProcessTree,
-} from '../dist/git-runner.js';
-import { startWindowsGitWorker } from '../dist/windows-git-worker.js';
+} from '../src/git-runner.js';
+import { startWindowsGitWorker } from '../src/windows-git-worker.js';
 
 class FakeRuntime extends EventEmitter {
   argv = ['node', 'windows-git-worker.js', '/fixture/git'];

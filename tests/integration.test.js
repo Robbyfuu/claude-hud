@@ -50,7 +50,7 @@ test("CLI renders expected output for a basic transcript", async (t) => {
       cwd: projectDir,
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -104,7 +104,7 @@ test("CLI renders added_dirs basenames on the project line", async (t) => {
       },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -148,7 +148,7 @@ test("CLI omits added dirs section when array is empty", async (t) => {
       workspace: { current_dir: projectDir, added_dirs: [] },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -186,7 +186,7 @@ test("CLI tolerates added_dirs: null without crashing", async (t) => {
       workspace: { added_dirs: null },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -234,7 +234,7 @@ test("CLI ignores non-string and post-sanitize-empty added_dirs entries", async 
       },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -283,7 +283,7 @@ test("CLI caps inline added_dirs at 5 with overflow indicator", async (t) => {
       workspace: { added_dirs: dirs },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -331,7 +331,7 @@ test("CLI truncates long inline added_dirs basenames", async (t) => {
       workspace: { added_dirs: [longDir] },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -386,7 +386,7 @@ test("CLI renders line layout 'Added dirs:' on a separate line", async (t) => {
       workspace: { added_dirs: [dirA, dirB] },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -435,7 +435,7 @@ test("CLI renders inline added_dirs even when showProject is false", async (t) =
       workspace: { added_dirs: [addedDir] },
     });
 
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -484,7 +484,7 @@ test("CLI applies caps in line layout (overflow + truncation)", async (t) => {
       cwd: projectDir,
       workspace: { added_dirs: dirs },
     });
-    let result = spawnSync("node", ["dist/index.js"], {
+    let result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -510,7 +510,7 @@ test("CLI applies caps in line layout (overflow + truncation)", async (t) => {
       cwd: projectDir,
       workspace: { added_dirs: [longDir] },
     });
-    result = spawnSync("node", ["dist/index.js"], {
+    result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: stdin,
       encoding: "utf8",
@@ -531,7 +531,7 @@ test("CLI prints initializing message on empty stdin", async (t) => {
   const homeDir = await mkdtemp(path.join(tmpdir(), "claude-hud-home-"));
 
   try {
-    const result = spawnSync("node", ["dist/index.js"], {
+    const result = spawnSync(process.execPath, ["src/index.ts"], {
       cwd: path.resolve(process.cwd()),
       input: "",
       encoding: "utf8",

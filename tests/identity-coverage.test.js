@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderIdentityLine } from '../dist/render/lines/identity.js';
+import { renderIdentityLine } from '../src/render/lines/identity.js';
 
 function stripAnsi(str) {
   return str

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { estimateSessionCost, resolveSessionCost, formatUsd } from '../dist/cost.js';
+import { estimateSessionCost, resolveSessionCost, formatUsd } from '../src/cost.js';
 
 test('estimateSessionCost returns null when sessionTokens is undefined', () => {
   assert.equal(estimateSessionCost({ model: { display_name: 'Claude Opus 4' } }, undefined), null);

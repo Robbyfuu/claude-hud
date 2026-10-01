@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { getGitBranch, getGitStatus } from '../dist/git.js';
+import { getGitBranch, getGitStatus } from '../src/git.js';
 
 test('getGitBranch returns null when cwd is undefined', async () => {
   const result = await getGitBranch(undefined);

@@ -8,7 +8,7 @@ import path from 'node:path';
 import {
   applyContextWindowFallback,
   _sweepCacheForTests,
-} from '../dist/context-cache.js';
+} from '../src/context-cache.js';
 
 async function createTempHome() {
   return await mkdtemp(path.join(tmpdir(), 'claude-hud-context-'));

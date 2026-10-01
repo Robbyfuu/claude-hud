@@ -12,7 +12,7 @@ import {
   _setResolveClaudeBinaryForTests,
   _setVersionInvocationEnvForTests,
   getClaudeCodeVersion,
-} from '../dist/version.js';
+} from '../src/version.js';
 
 function restoreEnvVar(name, value) {
   if (value === undefined) {

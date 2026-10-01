@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { setLanguage, getLanguage, getCanonicalLanguage, isCjkLanguage, t } from "../dist/i18n/index.js";
-import { en } from "../dist/i18n/en.js";
-import { zhHant } from "../dist/i18n/zh-Hant.js";
-import { mergeConfig } from "../dist/config.js";
-import { renderSessionTokensLine } from "../dist/render/lines/session-tokens.js";
+import { setLanguage, getLanguage, getCanonicalLanguage, isCjkLanguage, t } from "../src/i18n/index.js";
+import { en } from "../src/i18n/en.js";
+import { zhHant } from "../src/i18n/zh-Hant.js";
+import { mergeConfig } from "../src/config.js";
+import { renderSessionTokensLine } from "../src/render/lines/session-tokens.js";
 
 function stripAnsi(s) {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
