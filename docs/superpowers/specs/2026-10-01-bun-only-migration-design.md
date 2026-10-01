@@ -13,7 +13,7 @@ Make the fork Bun-only: install, type-check, test, coverage, CI, release, runtim
 |---|---|---|
 | Scope | Bun-only everywhere, Node support dropped | User choice. The fork's only consumer already runs `bun src/index.ts`. |
 | Build | No build. Bun runs `src/*.ts` directly; `tsc` is used for type-checking only | Measured: `bun src/index.ts` 63 ms/run, `bun build` bundle 62 ms/run, `node dist/index.js` 162 ms/run. A bundle adds a build step and a versioned `dist/` for no speed gain. |
-| Test runner | `bun test` running the existing `node:test` files unchanged | Measured: `bun test` already runs the current suite (1153 tests, 3.4 s); the failures are environmental (see Tests). No test rewrite. |
+| Test runner | `bun test` running the existing `node:test` files (the `node:test` API is kept) | Measured: `bun test` already runs the current suite (1153 tests, 3.4 s); the failures are environmental (see Tests). No test rewrite: test files change only where needed (imports `../dist/` → `../src/`, node spawns → `process.execPath`, `build-output.test.js` removed, `setup-command.test.js` updated). |
 | Coverage | `bun test --coverage` | Replaces `c8`. |
 | Windows | Unsupported; WSL with the Linux instructions | User choice (Bun-only total). |
 | Windows code in `src/` | Left untouched | Never runs on macOS/Linux; deleting it is an unrelated git refactor and the largest upstream-conflict source. Separate PR if wanted. |
@@ -52,11 +52,11 @@ Set `noEmit: true` and `types: ["bun"]`. Remove `outDir`, `declaration`, `declar
 - `tests/build-output.test.js` asserts the compiled `dist/` output; it is deleted with `dist/`.
 - `tests/setup-command.test.js` counts the `stty` snippet in `commands/setup.md` (3 today, 1 after the Windows/Node paths go) and gains a test that setup only offers Bun.
 - Under `bun test` today (importing `dist/`): 1122 pass, 25 fail, 6 skip. The 25 failures and their fixes:
-  1. **22 `countConfigs` / config-location tests**: Bun's `os.homedir()` reads `HOME` once at startup (measured: `HOME=/tmp/a bun -e "process.env.HOME='/tmp/changed'; os.homedir()"` → `/tmp/a`; Node → `/tmp/changed`). Tests set `process.env.HOME` at runtime. Fix: a `homeDir()` helper in `src/claude-config-dir.ts` returning `process.env.HOME || os.homedir()`, replacing the 12 `os.homedir()` calls in `src/`. Same result in the real statusline.
+  1. **22 `countConfigs` / config-location tests**: Bun's `os.homedir()` reads `HOME` once at startup (measured: `HOME=/tmp/a bun -e "process.env.HOME='/tmp/changed'; os.homedir()"` → `/tmp/a`; Node → `/tmp/changed`). Tests set `process.env.HOME` at runtime. Fix: a `getHomeDir()` helper (named to avoid shadowing seven local `const homeDir` variables) in `src/claude-config-dir.ts` returning `process.env.HOME || os.homedir()`, replacing the 12 `os.homedir()` calls in `src/`. Same result in the real statusline.
   2. **`index entrypoint runs when executed directly`**: `src/index.ts:263` compares `process.argv[1]` with `import.meta.url`'s path. Fix: `if (import.meta.main) void main();`. The test runs `bun src/index.ts` as a real subprocess and asserts the same observable output it asserts today.
   3. **`loadConfig returns valid config structure`** (`tests/config.test.js:26`): the valid-layout list lacks `panel`. Add it.
-  4. **`estimateSessionCost prices Claude 5 point releases like their base model`** (`tests/cost-coverage.test.js:165`): pre-existing upstream pricing bug. Out of scope; stays failing.
-- Target: `bun test` with exactly that one failure.
+  4. **`estimateSessionCost prices Claude 5 point releases like their base model`** (`tests/cost-coverage.test.js:165`): the test pins its clock to 2026-08-31 and failed only because Sonnet 5's introductory price ended 2026-09-01. Not a code bug; no change needed.
+- Target: `bun test` with 0 failures.
 
 ## Part 2 — CI and plugin
 
@@ -105,14 +105,14 @@ Merges from `jarrodwatts/claude-hud` will conflict in `package.json`, `package-l
 ## Out of scope
 
 - Removing Windows-specific code from `src/`.
-- The upstream pricing bug behind `cost-coverage.test.js:165`.
+- The pricing test `cost-coverage.test.js:165` (the test pins its clock to 2026-08-31 and failed only because Sonnet 5's introductory price ended 2026-09-01).
 - Translating `README.zh.md` beyond commands and requirements.
 
 ## Done criteria
 
 1. `bun install --frozen-lockfile` leaves the tree unchanged.
 2. `bun run typecheck` reports 0 errors.
-3. `bun test` has exactly one failure: `cost-coverage.test.js:165`.
+3. `bun test` has 0 failures.
 4. `grep -rnE '\bnpm\b|\bnpx\b|node --test|node dist'` over the repo (excluding `node_modules`, `.git`, `.serena`, `docs/superpowers/` and `CHANGELOG.md` history) returns nothing.
 5. The user's real `statusLine` command renders the panel after `git pull` in `~/Code/claude-hud`.
 6. CI is green on the PR.
@@ -120,7 +120,7 @@ Merges from `jarrodwatts/claude-hud` will conflict in `package.json`, `package-l
 ## Implementation tasks (for the plan)
 
 1. Toolchain: `package.json`, `tsconfig.json`, `bun.lock`, delete `package-lock.json`, `dist/`, `scripts/clean-dist.mjs`.
-2. Tests and code: `../dist/` → `../src/`, `homeDir()` helper, `import.meta.main`, `panel` in config test.
+2. Tests and code: `../dist/` → `../src/`, `getHomeDir()` helper, `import.meta.main`, `panel` in config test.
 3. CI: workflows, dependabot, PR template.
 4. Plugin: `commands/setup.md`.
 5. Docs.

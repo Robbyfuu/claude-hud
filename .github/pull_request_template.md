@@ -4,6 +4,7 @@
 
 - [ ] `bun test`
 - [ ] `bun run typecheck`
+- [ ] `bun run test:coverage`
 
 ## Checklist
 

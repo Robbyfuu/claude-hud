@@ -111,7 +111,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
 </plugin>
 
 <requirements>
-  <runtime>Bun 1.4+</runtime>
+  <runtime>Bun 1.4+ (macOS/Linux; Windows via WSL)</runtime>
   <claude_code>v1.0.80 or later</claude_code>
   <typecheck>TypeScript 7 (type-check only), ES2022 target, NodeNext modules</typecheck>
 </requirements>
