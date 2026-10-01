@@ -45,6 +45,8 @@ const EDGE_MARGIN = 4;
 const WIDE_MIN = 112;
 const MEDIUM_MIN = 76;
 const MAX_COMPLETED_SHOWN = 2;
+// A cold prompt cache rewrites the whole context; worth a new session past this size.
+const COLD_CACHE_REWRITE_MIN_TOKENS = 200_000;
 const s = (text, color, bold = false) => ({ text, color, bold });
 const sp = (n) => ({ text: ' '.repeat(Math.max(0, n)) });
 let ambiguousWide = false;
@@ -223,6 +225,33 @@ function projectLabel(ctx) {
     const parts = path.resolve(cwd).split(path.sep).filter(Boolean);
     return clean(parts.slice(-levels).join('/'), '/');
 }
+function contextLevel(ctx) {
+    const display = ctx.config?.display;
+    const autoCompactWindow = display?.autoCompactWindow ?? null;
+    const percent = display?.autocompactBuffer === 'disabled'
+        ? getContextPercent(ctx.stdin, autoCompactWindow)
+        : getBufferedPercent(ctx.stdin, autoCompactWindow);
+    return {
+        percent,
+        warning: display?.contextWarningThreshold ?? 70,
+        critical: display?.contextCriticalThreshold ?? 85,
+    };
+}
+/** One "start a new session" hint, highest priority first; null when none applies. */
+function adviceRow(ctx) {
+    const { percent, warning, critical } = contextLevel(ctx);
+    const context = `${label('panel.context')} ${percent}%`;
+    if (percent >= critical)
+        return [s(`↻ ${label('panel.adviceNow')} · ${context}`, PALETTE.red)];
+    const tokens = getTotalTokens(ctx.stdin);
+    if (ctx.stdin.prompt_cache?.warm === false && tokens >= COLD_CACHE_REWRITE_MIN_TOKENS) {
+        const rewrite = interpolate(label('panel.adviceColdCache'), { tokens: formatCount(tokens) });
+        return [s(`↻ ${label('panel.adviceNow')} · ${rewrite}`, PALETTE.amber)];
+    }
+    if (percent >= warning)
+        return [s(`↻ ${label('panel.adviceSoon')} · ${context}`, PALETTE.amber)];
+    return null;
+}
 function sessionRows(ctx) {
     const { stdin } = ctx;
     const rawName = clean(getModelName(stdin), 'Claude');
@@ -271,17 +300,36 @@ function sessionRows(ctx) {
     if (typeof cost?.total_cost_usd === 'number') {
         statsRow.push(s(' · ', PALETTE.dim), s(`$${cost.total_cost_usd.toFixed(2)}`, PALETTE.amber));
     }
+    let total = 0;
+    let cacheRead = 0;
+    for (const tokens of [ctx.transcript.sessionTokens, ctx.subagentTokens]) {
+        if (!tokens)
+            continue;
+        total += tokens.inputTokens + tokens.outputTokens + tokens.cacheCreationTokens + tokens.cacheReadTokens;
+        cacheRead += tokens.cacheReadTokens;
+    }
+    if (total > 0) {
+        statsRow.push(s(' · ', PALETTE.dim), s(formatCount(total), PALETTE.bright), s(` ${label('panel.tokens')}`, PALETTE.dim));
+        if (cacheRead > 0) {
+            const percent = Math.round((cacheRead / total) * 100);
+            statsRow.push(s(` (${interpolate(label('panel.cacheShare'), { percent })})`, PALETTE.dim));
+        }
+    }
     const added = cost?.total_lines_added ?? 0;
     const removed = cost?.total_lines_removed ?? 0;
     if (added > 0 || removed > 0) {
         statsRow.push(s(' · ', PALETTE.dim), s(`+${added}`, PALETTE.green), s(` −${removed}`, PALETTE.red));
     }
-    return [
+    const rows = [
         withIcon(ctx, 'model', PALETTE.violet, modelRow),
         withIcon(ctx, 'folder', PALETTE.pink, projectRow),
         withIcon(ctx, 'branch', PALETTE.pink, branchRow),
         withIcon(ctx, 'clock', PALETTE.dim, statsRow),
     ];
+    const advice = adviceRow(ctx);
+    if (advice)
+        rows.push(advice);
+    return rows;
 }
 function usageRows(ctx, innerWidth) {
     const display = ctx.config?.display;
@@ -302,11 +350,7 @@ function usageRows(ctx, innerWidth) {
     const resetGlyph = ctx.config?.panel?.icons === 'nerd' ? NERD_ICONS.reset : '↻';
     // Context
     const autoCompactWindow = display?.autoCompactWindow ?? null;
-    const percent = display?.autocompactBuffer === 'disabled'
-        ? getContextPercent(ctx.stdin, autoCompactWindow)
-        : getBufferedPercent(ctx.stdin, autoCompactWindow);
-    const warning = display?.contextWarningThreshold ?? 70;
-    const critical = display?.contextCriticalThreshold ?? 85;
+    const { percent, warning, critical } = contextLevel(ctx);
     const ctxColor = percent >= critical ? PALETTE.red : percent >= warning ? PALETTE.amber : PALETTE.cyan;
     const windowSize = typeof autoCompactWindow === 'number' && autoCompactWindow > 0
         ? autoCompactWindow
@@ -641,15 +685,18 @@ export function renderPanel(ctx, terminalWidth) {
     };
     let top;
     let environmentInActivity = false;
+    const session = sessionRows(ctx);
+    // 4 rows, or 5 when the session box carries the advice row.
+    const topHeight = session.length;
     if (width >= WIDE_MIN) {
         const available = width - 2;
         const sessionWidth = Math.round((available * 1.2) / 3.4);
         const envWidth = Math.max(32, Math.round((available * 0.85) / 3.4));
         const usageWidth = available - sessionWidth - envWidth;
         top = sideBySide([
-            box(titles.session, PALETTE.violet, sessionRows(ctx), sessionWidth, 4),
-            box(titles.usage, PALETTE.cyan, usageRows(ctx, usageWidth - 4), usageWidth, 4),
-            box(titles.environment, PALETTE.pink, environmentRows(ctx, envWidth - 4), envWidth, 4),
+            box(titles.session, PALETTE.violet, session, sessionWidth, topHeight),
+            box(titles.usage, PALETTE.cyan, usageRows(ctx, usageWidth - 4), usageWidth, topHeight),
+            box(titles.environment, PALETTE.pink, environmentRows(ctx, envWidth - 4), envWidth, topHeight),
         ]);
     }
     else if (width >= MEDIUM_MIN) {
@@ -657,15 +704,15 @@ export function renderPanel(ctx, terminalWidth) {
         const sessionWidth = Math.floor(available * 0.47);
         const usageWidth = available - sessionWidth;
         top = sideBySide([
-            box(titles.session, PALETTE.violet, sessionRows(ctx), sessionWidth, 4),
-            box(titles.usage, PALETTE.cyan, usageRows(ctx, usageWidth - 4), usageWidth, 4),
+            box(titles.session, PALETTE.violet, session, sessionWidth, topHeight),
+            box(titles.usage, PALETTE.cyan, usageRows(ctx, usageWidth - 4), usageWidth, topHeight),
         ]);
         environmentInActivity = true;
     }
     else {
         top = [
-            ...box(titles.session, PALETTE.violet, sessionRows(ctx), width, 4),
-            ...box(titles.usage, PALETTE.cyan, usageRows(ctx, width - 4), width, 4),
+            ...box(titles.session, PALETTE.violet, session, width, topHeight),
+            ...box(titles.usage, PALETTE.cyan, usageRows(ctx, width - 4), width, topHeight),
         ];
         environmentInActivity = true;
     }

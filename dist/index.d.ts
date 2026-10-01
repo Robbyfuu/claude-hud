@@ -1,7 +1,7 @@
 import { readStdin, getUsageFromStdin } from "./stdin.js";
 import { parseTranscript } from "./transcript.js";
 import { render } from "./render/index.js";
-import { readSubagentDetails } from "./subagents.js";
+import { readSubagentDetails, readSubagentTokenTotals } from "./subagents.js";
 import { countConfigs } from "./config-reader.js";
 import { getGitStatus } from "./git.js";
 import { getJjStatus, isJjRepo } from "./jj.js";
@@ -33,6 +33,7 @@ export type MainDeps = {
     readAuthInfo: typeof readAuthInfo;
     applyContextWindowFallback: typeof applyContextWindowFallback;
     readSubagentDetails: typeof readSubagentDetails;
+    readSubagentTokenTotals: typeof readSubagentTokenTotals;
     render: typeof render;
     now: () => number;
     log: (...args: unknown[]) => void;

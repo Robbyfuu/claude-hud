@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { getClaudeConfigDir } from './claude-config-dir.js';
+import { parseTranscript } from './transcript.js';
 import { sanitizeDisplayText } from './utils/sanitize.js';
 import { createDebug } from './debug.js';
 const debug = createDebug('subagents');
@@ -405,6 +406,35 @@ export function readAgentDefinitionSkills(agentType, cwd) {
         }
     }
     return [];
+}
+/**
+ * Token usage summed across every subagent transcript of the session. Reuses
+ * parseTranscript, which dedupes per message and caches each file by mtime+size.
+ */
+export async function readSubagentTokenTotals(transcriptPath) {
+    if (!transcriptPath)
+        return null;
+    const dir = getSubagentsDir(transcriptPath);
+    let files;
+    try {
+        files = fs.readdirSync(dir).filter((name) => name.endsWith('.jsonl')).slice(0, MAX_META_FILES);
+    }
+    catch {
+        return null;
+    }
+    if (files.length === 0)
+        return null;
+    const total = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+    for (const name of files) {
+        const tokens = (await parseTranscript(path.join(dir, name))).sessionTokens;
+        if (!tokens)
+            continue;
+        total.inputTokens += tokens.inputTokens;
+        total.outputTokens += tokens.outputTokens;
+        total.cacheCreationTokens += tokens.cacheCreationTokens;
+        total.cacheReadTokens += tokens.cacheReadTokens;
+    }
+    return total;
 }
 /**
  * Reads detail for the given agents (usually just the ones the panel shows).
