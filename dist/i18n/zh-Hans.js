@@ -63,6 +63,11 @@ export const zhHans = {
     "panel.noActivity": "暂无活动",
     "panel.noGit": "无 git",
     "panel.compact": "/compact",
+    "panel.tokens": "词元",
+    "panel.cacheShare": "{percent}% 缓存",
+    "panel.adviceNow": "新建会话",
+    "panel.adviceColdCache": "缓存已冷，将重写 {tokens}",
+    "panel.adviceSoon": "即将需要新建会话",
     // Init
     "init.initializing": "[claude-hud] 正在初始化...",
     "init.macosNote": "[claude-hud] 注意：在 macOS 上，您可能需要重启 Claude Code 才能显示 HUD。",

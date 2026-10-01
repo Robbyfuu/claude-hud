@@ -63,6 +63,11 @@ export const en = {
     "panel.noActivity": "no activity yet",
     "panel.noGit": "no git",
     "panel.compact": "/compact",
+    "panel.tokens": "tok",
+    "panel.cacheShare": "{percent}% cache",
+    "panel.adviceNow": "new session",
+    "panel.adviceColdCache": "cold cache, rewrites {tokens}",
+    "panel.adviceSoon": "new session soon",
     // Init
     "init.initializing": "[claude-hud] Initializing...",
     "init.macosNote": "[claude-hud] Note: On macOS, you may need to restart Claude Code for the HUD to appear.",

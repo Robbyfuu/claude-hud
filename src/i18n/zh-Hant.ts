@@ -68,6 +68,11 @@ export const zhHant: Messages = {
   "panel.noActivity": "暫無活動",
   "panel.noGit": "無 git",
   "panel.compact": "/compact",
+  "panel.tokens": "詞元",
+  "panel.cacheShare": "{percent}% 快取",
+  "panel.adviceNow": "新建會話",
+  "panel.adviceColdCache": "快取已冷，將重寫 {tokens}",
+  "panel.adviceSoon": "即將需要新建會話",
 
   // Init
   "init.initializing": "[claude-hud] 正在初始化...",

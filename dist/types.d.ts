@@ -213,5 +213,6 @@ export interface RenderContext {
     effortSymbol?: string;
     authInfo?: AuthInfo | null;
     subagents?: Map<string, SubagentDetail>;
+    subagentTokens?: SessionTokenUsage | null;
 }
 //# sourceMappingURL=types.d.ts.map

@@ -68,6 +68,11 @@ export const es: Messages = {
   "panel.noActivity": "sin actividad aún",
   "panel.noGit": "sin git",
   "panel.compact": "/compact",
+  "panel.tokens": "tok",
+  "panel.cacheShare": "{percent}% caché",
+  "panel.adviceNow": "nueva sesión",
+  "panel.adviceColdCache": "caché fría, reescribe {tokens}",
+  "panel.adviceSoon": "nueva sesión pronto",
 
   // Init
   "init.initializing": "[claude-hud] Inicializando...",

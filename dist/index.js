@@ -2,7 +2,7 @@ import { readStdin, getUsageFromStdin } from "./stdin.js";
 import { parseTranscript } from "./transcript.js";
 import { render } from "./render/index.js";
 import { selectPanelAgents } from "./render/panel.js";
-import { readSubagentDetails } from "./subagents.js";
+import { readSubagentDetails, readSubagentTokenTotals } from "./subagents.js";
 import { countConfigs } from "./config-reader.js";
 import { getGitStatus } from "./git.js";
 import { getJjStatus, isJjRepo } from "./jj.js";
@@ -73,6 +73,7 @@ export async function main(overrides = {}) {
         readAuthInfo,
         applyContextWindowFallback,
         readSubagentDetails,
+        readSubagentTokenTotals,
         render,
         now: () => Date.now(),
         log: console.log,
@@ -176,6 +177,7 @@ export async function main(overrides = {}) {
         if (config.lineLayout === "panel") {
             const { shown } = selectPanelAgents(transcript.agents, config, deps.now());
             ctx.subagents = deps.readSubagentDetails(transcriptPath, shown, stdin.cwd);
+            ctx.subagentTokens = await deps.readSubagentTokenTotals(transcriptPath);
         }
         deps.render(ctx);
     }

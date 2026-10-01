@@ -63,6 +63,11 @@ export type MessageKey =
   | "panel.noActivity"
   | "panel.noGit"
   | "panel.compact"
+  | "panel.tokens"
+  | "panel.cacheShare"
+  | "panel.adviceNow"
+  | "panel.adviceColdCache"
+  | "panel.adviceSoon"
   // Init
   | "init.initializing"
   | "init.macosNote";

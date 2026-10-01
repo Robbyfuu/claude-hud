@@ -1,4 +1,4 @@
-import type { AgentEntry, SubagentDetail } from './types.js';
+import type { AgentEntry, SessionTokenUsage, SubagentDetail } from './types.js';
 export declare function getSubagentsDir(transcriptPath: string): string;
 /**
  * Maps spawning tool_use ids to subagent transcript paths. Background teammates'
@@ -11,6 +11,11 @@ export declare function describeToolTarget(toolName: string, input?: Record<stri
 export declare function parseSubagentTranscript(filePath: string): SubagentDetail | null;
 /** Skills preloaded by an agent definition's `skills:` frontmatter. */
 export declare function readAgentDefinitionSkills(agentType: string, cwd?: string): string[];
+/**
+ * Token usage summed across every subagent transcript of the session. Reuses
+ * parseTranscript, which dedupes per message and caches each file by mtime+size.
+ */
+export declare function readSubagentTokenTotals(transcriptPath: string): Promise<SessionTokenUsage | null>;
 /**
  * Reads detail for the given agents (usually just the ones the panel shows).
  * Returns a map keyed by the agent's spawning tool_use id.

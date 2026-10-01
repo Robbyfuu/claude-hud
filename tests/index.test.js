@@ -728,6 +728,30 @@ test("main includes memoryUsage in render context only for expanded layout when 
   assert.deepEqual(renderedContext?.memoryUsage, mockMemoryUsage);
 });
 
+test("main adds subagent token totals to the render context for the panel layout", async () => {
+  let renderedContext;
+  let requestedPath;
+  const totals = { inputTokens: 1, outputTokens: 2, cacheCreationTokens: 3, cacheReadTokens: 4 };
+
+  await main({
+    readStdin: async () => makeStdin({ transcript_path: "/tmp/project/sess.jsonl" }),
+    parseTranscript: async () => makeTranscript(),
+    countConfigs: async () => makeCounts(),
+    loadConfig: async () => makeConfig({ lineLayout: "panel" }),
+    getGitStatus: async () => null,
+    readSubagentTokenTotals: async (transcriptPath) => {
+      requestedPath = transcriptPath;
+      return totals;
+    },
+    render: (ctx) => {
+      renderedContext = ctx;
+    },
+  });
+
+  assert.equal(requestedPath, "/tmp/project/sess.jsonl");
+  assert.deepEqual(renderedContext?.subagentTokens, totals);
+});
+
 test("main skips memoryUsage lookup for compact layout even when enabled", async () => {
   let lookupCalls = 0;
 

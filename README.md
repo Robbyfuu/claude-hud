@@ -459,6 +459,9 @@ Set `"lineLayout": "panel"` for a boxed dashboard sized to the terminal width:
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
+The session box's last row adds the session's token total after the cost, including every subagent transcript, with the share read from cache: `139M tok (94% cache)`.
+When starting fresh would help, a fifth row shows one hint, highest priority first: `↻ new session · context 87%` (context at or above `display.contextCriticalThreshold`), `↻ new session · cold cache, rewrites 659k` (prompt cache cold with at least 200k context tokens), or `↻ new session soon · context 72%` (context at or above `display.contextWarningThreshold`).
+
 The agent table reads each subagent's own transcript (`<session>/subagents/agent-<id>.jsonl`):
 
 - **SKILLS**: skills preloaded by the agent definition's `skills:` frontmatter plus skills the agent invoked with the Skill tool.

@@ -1,8 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import type { AgentEntry, SubagentDetail } from './types.js';
+import type { AgentEntry, SessionTokenUsage, SubagentDetail } from './types.js';
 import { getClaudeConfigDir } from './claude-config-dir.js';
+import { parseTranscript } from './transcript.js';
 import { sanitizeDisplayText } from './utils/sanitize.js';
 import { createDebug } from './debug.js';
 
@@ -427,6 +428,32 @@ export function readAgentDefinitionSkills(agentType: string, cwd?: string): stri
     }
   }
   return [];
+}
+
+/**
+ * Token usage summed across every subagent transcript of the session. Reuses
+ * parseTranscript, which dedupes per message and caches each file by mtime+size.
+ */
+export async function readSubagentTokenTotals(transcriptPath: string): Promise<SessionTokenUsage | null> {
+  if (!transcriptPath) return null;
+  const dir = getSubagentsDir(transcriptPath);
+  let files: string[];
+  try {
+    files = fs.readdirSync(dir).filter((name) => name.endsWith('.jsonl')).slice(0, MAX_META_FILES);
+  } catch {
+    return null;
+  }
+  if (files.length === 0) return null;
+  const total: SessionTokenUsage = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+  for (const name of files) {
+    const tokens = (await parseTranscript(path.join(dir, name))).sessionTokens;
+    if (!tokens) continue;
+    total.inputTokens += tokens.inputTokens;
+    total.outputTokens += tokens.outputTokens;
+    total.cacheCreationTokens += tokens.cacheCreationTokens;
+    total.cacheReadTokens += tokens.cacheReadTokens;
+  }
+  return total;
 }
 
 /**
