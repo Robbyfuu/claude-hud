@@ -5,6 +5,8 @@ allowed-tools: Bash, Read, Edit, AskUserQuestion
 
 **Note**: Placeholders like `{RUNTIME_PATH}`, `{SOURCE}`, and `{GENERATED_COMMAND}` should be substituted with actual detected values.
 
+**Platform gate**: If the environment `Platform:` is `win32`, stop setup now and tell the user that Windows is not supported natively. They should run Claude Code inside WSL (Windows Subsystem for Linux) and follow the Linux instructions. Do not run any command below on native Windows.
+
 ## Step 0: Detect Ghost Installation (Run First)
 
 Check for inconsistent plugin state that can occur after failed installations:
@@ -70,11 +72,11 @@ mkdir -p ~/.cache/tmp && TMPDIR=~/.cache/tmp claude /plugin install claude-hud
 
 ---
 
-## Step 1: Detect Platform, Shell, and Runtime
+## Step 1: Detect Platform and Runtime
 
 **IMPORTANT**: Use the environment context value `Platform:` as your starting point. claude-hud runs on Bun and supports macOS and Linux only.
 
-**Windows is not supported.** If `Platform:` is `win32`, tell the user to run Claude Code inside WSL (Windows Subsystem for Linux), install the plugin there, and follow the Linux instructions below. Do not generate a Windows-native command.
+**Windows is not supported** (see the platform gate at the top). Run Claude Code inside WSL, install the plugin there, and follow the Linux instructions below. Do not generate a Windows-native command.
 
 | Platform | Command Format |
 |----------|----------------|

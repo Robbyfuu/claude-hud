@@ -14,8 +14,17 @@ test('setup only offers the Bun runtime', async () => {
 
   assert.doesNotMatch(setup, /command -v node/);
   assert.doesNotMatch(setup, /dist\/index\.js/);
-  assert.doesNotMatch(setup, /PowerShell/);
-  assert.doesNotMatch(setup, /\$env:|\$existingCommand|\$backupPath/);
+  assert.doesNotMatch(setup, /PowerShell/i);
+  assert.doesNotMatch(setup, /\$env:|\$existingCommand|\$backupPath/i);
   assert.match(setup, /command -v bun/);
   assert.match(setup, /WSL/);
+});
+
+test('setup gates Windows before Step 0', async () => {
+  const setup = await readFile(new URL('../commands/setup.md', import.meta.url), 'utf8');
+
+  assert.ok(
+    setup.indexOf('WSL') !== -1 && setup.indexOf('WSL') < setup.indexOf('## Step 0'),
+    'the Windows/WSL gate must appear before Step 0',
+  );
 });
