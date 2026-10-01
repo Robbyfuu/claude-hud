@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { getOutputSpeed } from '../dist/speed-tracker.js';
+import { getOutputSpeed } from '../src/speed-tracker.js';
 import { existsSync } from 'node:fs';
 
 function restoreEnvVar(name, value) {

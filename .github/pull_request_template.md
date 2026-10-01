@@ -2,8 +2,9 @@
 
 ## Testing
 
-- [ ] `npm test`
-- [ ] `npm run test:coverage`
+- [ ] `bun test`
+- [ ] `bun run typecheck`
+- [ ] `bun run test:coverage`
 
 ## Checklist
 

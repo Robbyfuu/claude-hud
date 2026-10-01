@@ -9,7 +9,7 @@ import {
   DEFAULT_ELEMENT_ORDER,
   DEFAULT_MERGE_GROUPS,
   DEFAULT_PROJECT_LINE_ORDER,
-} from '../dist/config.js';
+} from '../src/config.js';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
@@ -30,7 +30,7 @@ test('loadConfig returns valid config structure', async () => {
   assert.ok([1, 2, 3, 'full'].includes(config.pathLevels), 'pathLevels should be 1, 2, 3, or "full"');
 
   // lineLayout must be valid
-  const validLineLayouts = ['compact', 'expanded'];
+  const validLineLayouts = ['compact', 'expanded', 'panel'];
   assert.ok(validLineLayouts.includes(config.lineLayout), 'lineLayout should be valid');
 
   // showSeparators must be boolean

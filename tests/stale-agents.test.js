@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseTranscript } from '../dist/transcript.js';
+import { parseTranscript } from '../src/transcript.js';
 
 async function parse(entries) {
   const dir = await mkdtemp(path.join(tmpdir(), 'hud-stale-agents-'));

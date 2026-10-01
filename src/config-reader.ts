@@ -1,9 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { createHash } from 'node:crypto';
 import { createDebug } from './debug.js';
-import { getClaudeConfigDir, getClaudeConfigJsonPath, getHudPluginDir } from './claude-config-dir.js';
+import { getClaudeConfigDir, getClaudeConfigJsonPath, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 
 const debug = createDebug('config-reader');
 
@@ -373,7 +372,7 @@ function computeConfigCountsFresh(cwd?: string): ConfigCounts {
   let hooksCount = 0;
   let outputStyle: string | undefined;
 
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   const claudeDir = getClaudeConfigDir(homeDir);
 
   // Collect all MCP servers across scopes, then subtract disabled ones
@@ -491,7 +490,7 @@ function computeConfigCountsFresh(cwd?: string): ConfigCounts {
 }
 
 export async function countConfigs(cwd?: string): Promise<ConfigCounts> {
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   const claudeDir = getClaudeConfigDir(homeDir);
   const claudeConfigJsonPath = getClaudeConfigJsonPath(homeDir);
   const normalizedCwd = cwd ? path.resolve(cwd) : null;

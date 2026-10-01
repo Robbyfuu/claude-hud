@@ -64,17 +64,6 @@ claude plugin install claude-hud@claude-hud
 /claude-hud:setup
 ```
 
-<details>
-<summary><strong>⚠️ Windows 用户：如果 setup 提示未找到 JavaScript 运行时，请点击此处</strong></summary>
-
-在 Windows 上，Claude HUD setup 支持的运行时是 Node.js LTS。如果 setup 提示未找到 JavaScript 运行时，请先为你的 shell 安装 Node.js：
-```powershell
-winget install OpenJS.NodeJS.LTS
-```
-然后重启 shell 并再次运行 `/claude-hud:setup`。
-
-</details>
-
 完成！Claude Code 会自动重新加载设置——发送下一条消息后 HUD 就会出现，无需重启。如果没有显示，请重启 Claude Code（旧版 Claude Code 需要重启才能加载 statusLine 变更）。
 
 ---
@@ -473,18 +462,16 @@ CLAUDE_HUD_DISABLE=1 claude
 ## 运行环境要求
 
 - Claude Code v1.0.80+
-- macOS/Linux：Node.js 18+ 或 Bun
-- Windows：Node.js 18+
+- Bun 1.4+（macOS/Linux；Windows 请使用 WSL）
 
 ---
 
 ## 开发
 
 ```bash
-git clone https://github.com/jarrodwatts/claude-hud
+git clone https://github.com/Robbyfuu/claude-hud
 cd claude-hud
-npm ci && npm run build
-npm test
+bun install && bun test
 ```
 
 详见 [CONTRIBUTING.md](CONTRIBUTING.md)。

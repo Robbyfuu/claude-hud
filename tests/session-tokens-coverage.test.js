@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderSessionTokensLine } from '../dist/render/lines/session-tokens.js';
+import { renderSessionTokensLine } from '../src/render/lines/session-tokens.js';
 
 function stripAnsi(str) {
   return str

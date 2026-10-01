@@ -2,14 +2,12 @@
 node_modules/
 
 # Build artifacts
-# dist/ is gitignored but exists on main - CI builds and commits it after each merge.
-# See .github/workflows/build-dist.yml
+# dist/ is not used: Bun runs src/ directly.
 dist/
 *.tsbuildinfo
 
 # Logs
 *.log
-npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
@@ -54,6 +52,5 @@ tmp/
 temp/
 *.tmp
 
-# Lock files (keep package-lock.json for npm)
+# Lock files (bun.lock is committed)
 yarn.lock
-bun.lock

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatResetTime } from '../dist/render/format-reset-time.js';
+import { formatResetTime } from '../src/render/format-reset-time.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,25 +174,25 @@ test('opts: midnight boundary — h24 shows 24, not 00', () => {
 // ---------------------------------------------------------------------------
 
 test('mergeConfig defaults timeFormat to "relative"', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({});
   assert.equal(config.display.timeFormat, 'relative');
 });
 
 test('mergeConfig accepts "absolute" timeFormat', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({ display: { timeFormat: 'absolute' } });
   assert.equal(config.display.timeFormat, 'absolute');
 });
 
 test('mergeConfig accepts "both" timeFormat', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({ display: { timeFormat: 'both' } });
   assert.equal(config.display.timeFormat, 'both');
 });
 
 test('mergeConfig rejects invalid timeFormat and falls back to "relative"', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({ display: { timeFormat: 'invalid-value' } });
   assert.equal(config.display.timeFormat, 'relative');
 });
@@ -202,31 +202,31 @@ test('mergeConfig rejects invalid timeFormat and falls back to "relative"', asyn
 // ---------------------------------------------------------------------------
 
 test('mergeConfig defaults hourCycle to "auto"', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({});
   assert.equal(config.display.hourCycle, 'auto');
 });
 
 test('mergeConfig accepts a valid hourCycle', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({ display: { hourCycle: 'h23' } });
   assert.equal(config.display.hourCycle, 'h23');
 });
 
 test('mergeConfig rejects invalid hourCycle and falls back to "auto"', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({ display: { hourCycle: 'not-a-cycle' } });
   assert.equal(config.display.hourCycle, 'auto');
 });
 
 test('mergeConfig defaults showClockSeconds to false', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({});
   assert.equal(config.display.showClockSeconds, false);
 });
 
 test('mergeConfig accepts showClockSeconds true', async () => {
-  const { mergeConfig } = await import('../dist/config.js');
+  const { mergeConfig } = await import('../src/config.js');
   const config = mergeConfig({ display: { showClockSeconds: true } });
   assert.equal(config.display.showClockSeconds, true);
 });

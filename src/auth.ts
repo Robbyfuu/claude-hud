@@ -1,8 +1,7 @@
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { getClaudeConfigJsonPath, getHudPluginDir } from './claude-config-dir.js';
+import { getClaudeConfigJsonPath, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { sanitizeDisplayText } from './utils/sanitize.js';
 
 /**
@@ -221,7 +220,7 @@ export function readAuthInfo(): AuthInfo {
     return API_KEY_AUTH_INFO;
   }
 
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   const configJsonPath = getClaudeConfigJsonPath(homeDir);
 
   let stat: fs.Stats;

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { render } from '../dist/render/index.js';
-import { mergeConfig } from '../dist/config.js';
-import { setLanguage } from '../dist/i18n/index.js';
+import { render } from '../src/render/index.js';
+import { mergeConfig } from '../src/config.js';
+import { setLanguage } from '../src/i18n/index.js';
 
 function baseContext() {
   return {
@@ -784,7 +784,7 @@ test('separator width accounts for CJK ambiguous-wide dashes so the terminal doe
 
 test('width math counts ambiguous chars as 2 cells only in CJK mode', async () => {
   const { codePointCellWidth, isAmbiguousWideCodePoint, isCjkAmbiguousWide } =
-    await import('../dist/render/width.js');
+    await import('../src/render/width.js');
 
   assert.equal(isAmbiguousWideCodePoint(0x2588), true, '█ U+2588 is ambiguous');
   assert.equal(isAmbiguousWideCodePoint(0x2502), true, '│ U+2502 is ambiguous');

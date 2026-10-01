@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { isJjRepo, getJjStatus } from '../dist/jj.js';
+import { isJjRepo, getJjStatus } from '../src/jj.js';
 
 function hasJj() {
   try {

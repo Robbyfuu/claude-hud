@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitize, parseExtraCmdArg, runExtraCmd, isExtraCmdAllowed } from '../dist/extra-cmd.js';
+import { sanitize, parseExtraCmdArg, runExtraCmd, isExtraCmdAllowed } from '../src/extra-cmd.js';
 
 // ============================================================================
 // sanitize() tests

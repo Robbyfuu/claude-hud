@@ -1,15 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm, writeFile, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import os, { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { _setCreateReadStreamForTests, parseTranscript } from '../dist/transcript.js';
-import { TRANSCRIPT_MODEL_MAX_LEN } from '../dist/model-source.js';
-import { countConfigs } from '../dist/config-reader.js';
-import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, getUsageFromStdin, isBedrockModelId, stripContextSuffix, formatModelName, resolveModelName } from '../dist/stdin.js';
-import { estimateSessionCost, resolveSessionCost, formatUsd } from '../dist/cost.js';
+import { _setCreateReadStreamForTests, parseTranscript } from '../src/transcript.js';
+import { TRANSCRIPT_MODEL_MAX_LEN } from '../src/model-source.js';
+import { countConfigs } from '../src/config-reader.js';
+import { getHomeDir } from '../src/claude-config-dir.js';
+import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, getUsageFromStdin, isBedrockModelId, stripContextSuffix, formatModelName, resolveModelName } from '../src/stdin.js';
+import { estimateSessionCost, resolveSessionCost, formatUsd } from '../src/cost.js';
 import * as fs from 'node:fs';
 
 function restoreEnvVar(name, value) {
@@ -3369,4 +3370,16 @@ test('parseTranscript ignores a non-string resolvedModel', async () => {
   );
 
   assert.equal(result.agents[0]?.model, 'sonnet');
+});
+
+test('getHomeDir falls back to os.homedir() when HOME is empty', () => {
+  const originalHome = process.env.HOME;
+  try {
+    process.env.HOME = '';
+    assert.equal(getHomeDir(), os.homedir());
+    process.env.HOME = '/tmp/hud-home';
+    assert.equal(getHomeDir(), '/tmp/hud-home');
+  } finally {
+    restoreEnvVar('HOME', originalHome);
+  }
 });

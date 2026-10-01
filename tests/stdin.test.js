@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { readStdin, getProviderLabel, getContextPercent, getBufferedPercent } from '../dist/stdin.js';
-import { mergeConfig } from '../dist/config.js';
+import { readStdin, getProviderLabel, getContextPercent, getBufferedPercent } from '../src/stdin.js';
+import { mergeConfig } from '../src/config.js';
 
 test('readStdin returns null for TTY input', async () => {
   const originalIsTTY = process.stdin.isTTY;

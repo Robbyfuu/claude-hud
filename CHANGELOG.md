@@ -4,6 +4,9 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Bun-only toolchain and runtime: no dist/ build, tests run with bun test, setup requires Bun (Windows via WSL). Statusline commands that point at dist/index.js must re-run /claude-hud:setup.
+
 ### Added
 - `display.showDailyCost` option to show today's cumulative spend across sessions (`Today $12.34`), accumulated from the native stdin `cost.total_cost_usd` into a per-day ledger that resets at local midnight (#695).
 

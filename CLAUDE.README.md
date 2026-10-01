@@ -111,9 +111,9 @@ Technical documentation for agents who need to understand, modify, or debug Clau
 </plugin>
 
 <requirements>
-  <runtime>Node.js 18+ or Bun</runtime>
+  <runtime>Bun 1.4+ (macOS/Linux; Windows via WSL)</runtime>
   <claude_code>v1.0.80 or later</claude_code>
-  <build>TypeScript 5, ES2022 target, NodeNext modules</build>
+  <typecheck>TypeScript 7 (type-check only), ES2022 target, NodeNext modules</typecheck>
 </requirements>
 
 <architecture>
@@ -262,23 +262,22 @@ Technical documentation for agents who need to understand, modify, or debug Clau
 
 <development>
   <setup>
-    git clone https://github.com/jarrodwatts/claude-hud
+    git clone https://github.com/Robbyfuu/claude-hud
     cd claude-hud
-    npm ci
-    npm run build
+    bun install
   </setup>
 
   <test_commands>
-    npm test                    # Run all tests
-    npm run build               # Compile TypeScript to dist/
+    bun test                    # Run all tests
+    bun run typecheck           # Type-check (no build step)
   </test_commands>
 
   <manual_testing>
     # Test with sample stdin data:
-    echo '{"model":{"display_name":"Opus"},"context_window":{"current_usage":{"input_tokens":45000},"context_window_size":200000}}' | node dist/index.js
+    echo '{"model":{"display_name":"Opus"},"context_window":{"current_usage":{"input_tokens":45000},"context_window_size":200000}}' | bun --env-file /dev/null src/index.ts
 
     # Test with transcript path:
-    echo '{"model":{"display_name":"Sonnet"},"transcript_path":"/path/to/transcript.jsonl","context_window":{"current_usage":{"input_tokens":90000},"context_window_size":200000}}' | node dist/index.js
+    echo '{"model":{"display_name":"Sonnet"},"transcript_path":"/path/to/transcript.jsonl","context_window":{"current_usage":{"input_tokens":90000},"context_window_size":200000}}' | bun --env-file /dev/null src/index.ts
   </manual_testing>
 </development>
 
@@ -288,7 +287,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
     <step>Add new interface fields in types.ts</step>
     <step>Create new render file in src/render/ or modify existing</step>
     <step>Update src/render/index.ts to include new line</step>
-    <step>Run npm run build and test</step>
+    <step>Run bun run typecheck and bun test</step>
   </extending>
 
   <modifying_thresholds>
@@ -329,9 +328,9 @@ Technical documentation for agents who need to understand, modify, or debug Clau
   </issue>
 
   <issue name="Build errors">
-    <solution>Ensure Node.js 18+ installed</solution>
-    <solution>Run npm ci to reinstall dependencies</solution>
-    <solution>Delete dist/ and node_modules/, then npm ci && npm run build</solution>
+    <solution>Ensure Bun 1.4+ installed</solution>
+    <solution>Run bun install to reinstall dependencies</solution>
+    <solution>Delete node_modules/, then bun install</solution>
   </issue>
 </troubleshooting>
 
@@ -387,7 +386,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
     If the user wants to modify Claude HUD:
     1. Clone the repo or navigate to the plugin directory
     2. Make changes following the file_structure section
-    3. Run npm run build to compile
+    3. Run bun run typecheck and bun test
     4. Changes appear on the next statusline refresh — send a message to trigger one (no restart needed; the statusLine command re-runs each refresh)
   </modify>
 

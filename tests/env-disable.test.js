@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isHudDisabled, main } from '../dist/index.js';
-import { DEFAULT_CONFIG } from '../dist/config.js';
+import { isHudDisabled, main } from '../src/index.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
 
 function restoreEnvVar(name, value) {
   if (value === undefined) {

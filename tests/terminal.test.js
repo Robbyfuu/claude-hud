@@ -1,6 +1,6 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getAdaptiveBarWidth, getTerminalWidth } from '../dist/utils/terminal.js';
+import { getAdaptiveBarWidth, getTerminalWidth } from '../src/utils/terminal.js';
 
 test('getTerminalWidth caps hostile widths', () => {
   const originalColumns = process.env.COLUMNS;

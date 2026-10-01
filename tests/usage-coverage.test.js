@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderUsageLine } from '../dist/render/lines/usage.js';
+import { renderUsageLine } from '../src/render/lines/usage.js';
 
 function stripAnsi(str) {
   return str
