@@ -4,6 +4,7 @@ import { renderToolsLine } from './tools-line.js';
 import { renderSkillsLine, renderMcpLine } from './skills-mcp-line.js';
 import { renderAgentsLine } from './agents-line.js';
 import { renderTodosLine } from './todos-line.js';
+import { renderPanel } from './panel.js';
 import { renderIdentityLine, renderProjectLine, renderAddedDirsLine, renderGitFilesLine, renderEnvironmentLine, renderPromptCacheLine, renderUsageLine, renderMemoryLine, renderSessionTokensLine, renderCompactionsLine, renderSessionTimeLine, } from './lines/index.js';
 import { dim, RESET } from './colors.js';
 import { getTerminalWidth, UNKNOWN_TERMINAL_WIDTH } from '../utils/terminal.js';
@@ -484,6 +485,14 @@ export function render(ctx) {
         ? configuredMaxWidth
         : (detectedWidth ?? configuredMaxWidth ?? UNKNOWN_TERMINAL_WIDTH);
     let lines;
+    if (lineLayout === 'panel') {
+        // The panel sizes every line to the terminal itself; wrapping would break
+        // the box borders, so print it as-is.
+        for (const line of renderPanel(ctx, terminalWidth)) {
+            console.log(`${RESET}${line}`);
+        }
+        return;
+    }
     if (lineLayout === 'expanded') {
         const renderedLines = renderExpanded(ctx, terminalWidth);
         lines = renderedLines.map(({ line }) => line);

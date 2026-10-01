@@ -67,6 +67,11 @@ export const DEFAULT_CONFIG = {
         showDirty: true,
         showConflicts: true,
     },
+    panel: {
+        icons: 'none',
+        maxAgents: 5,
+        completedRetentionSeconds: 120,
+    },
     display: {
         showModel: true,
         showProject: true,
@@ -171,7 +176,7 @@ function validatePathLevels(value) {
     return value === 1 || value === 2 || value === 3 || value === 'full';
 }
 function validateLineLayout(value) {
-    return value === 'compact' || value === 'expanded';
+    return value === 'compact' || value === 'expanded' || value === 'panel';
 }
 function validateAutocompactBuffer(value) {
     return value === 'enabled' || value === 'disabled';
@@ -186,7 +191,7 @@ function validateUsageValue(value) {
     return value === 'percent' || value === 'remaining';
 }
 function validateLanguage(value) {
-    return value === 'en' || value === 'zh' || value === 'zh-Hans' || value === 'zh-Hant' || value === 'zh-TW';
+    return value === 'en' || value === 'es' || value === 'zh' || value === 'zh-Hans' || value === 'zh-Hant' || value === 'zh-TW';
 }
 function validateModelFormat(value) {
     return value === 'full' || value === 'compact' || value === 'short';
@@ -468,6 +473,19 @@ export function mergeConfig(userConfig) {
             ? migrated.jjStatus.showConflicts
             : DEFAULT_CONFIG.jjStatus.showConflicts,
     };
+    const rawPanel = migrated.panel;
+    const panel = {
+        icons: rawPanel?.icons === 'nerd' || rawPanel?.icons === 'none'
+            ? rawPanel.icons
+            : DEFAULT_CONFIG.panel.icons,
+        maxAgents: typeof rawPanel?.maxAgents === 'number' && Number.isFinite(rawPanel.maxAgents)
+            ? Math.min(20, Math.max(1, Math.floor(rawPanel.maxAgents)))
+            : DEFAULT_CONFIG.panel.maxAgents,
+        completedRetentionSeconds: typeof rawPanel?.completedRetentionSeconds === 'number'
+            && Number.isFinite(rawPanel.completedRetentionSeconds)
+            ? Math.min(86_400, Math.max(0, Math.floor(rawPanel.completedRetentionSeconds)))
+            : DEFAULT_CONFIG.panel.completedRetentionSeconds,
+    };
     const display = {
         showModel: typeof migrated.display?.showModel === 'boolean'
             ? migrated.display.showModel
@@ -668,7 +686,7 @@ export function mergeConfig(userConfig) {
             ? migrated.colors.barEmpty
             : DEFAULT_CONFIG.colors.barEmpty,
     };
-    return { language, lineLayout, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, projectLineOrder, gitStatus, jjStatus, display, colors };
+    return { language, lineLayout, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, projectLineOrder, gitStatus, jjStatus, panel, display, colors };
 }
 function isPlainObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value);

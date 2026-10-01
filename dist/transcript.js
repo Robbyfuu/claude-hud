@@ -9,7 +9,7 @@ import { sanitizeDisplayText } from './utils/sanitize.js';
 import { sanitizeTranscriptModel } from './model-source.js';
 import { isDetectedPromptCacheTtl, PROMPT_CACHE_TTL_1H_SECONDS, PROMPT_CACHE_TTL_5M_SECONDS, } from './constants.js';
 const debug = createDebug('transcript');
-const TRANSCRIPT_CACHE_VERSION = 18;
+const TRANSCRIPT_CACHE_VERSION = 19;
 const MCP_TOOL_NAME_PATTERN = /^mcp__(.+?)__(.+)$/;
 const ACTIVITY_NAME_MAX_LEN = 64;
 const MESSAGE_ID_MAX_LEN = 128;
@@ -201,6 +201,7 @@ function serializeTranscriptData(data) {
             startTime: tool.startTime.toISOString(),
             endTime: tool.endTime?.toISOString(),
         })),
+        toolCounts: data.toolCounts ? { ...data.toolCounts } : undefined,
         skills: [...data.skills],
         mcpServers: [...data.mcpServers],
         mcpErrors: [...data.mcpErrors],
@@ -231,6 +232,7 @@ function deserializeTranscriptData(data) {
             startTime: new Date(tool.startTime),
             endTime: tool.endTime ? new Date(tool.endTime) : undefined,
         })),
+        toolCounts: normalizeToolCounts(data.toolCounts),
         skills: normalizeNameList(data.skills),
         mcpServers: normalizeNameList(data.mcpServers),
         mcpErrors: normalizeNameList(data.mcpErrors).slice(0, MCP_ERROR_SERVERS_MAX),
@@ -263,6 +265,17 @@ function deserializeTranscriptData(data) {
         ultracodeActive: typeof data.ultracodeActive === 'boolean' ? data.ultracodeActive : undefined,
         lastAssistantModel: sanitizeTranscriptModel(data.lastAssistantModel),
     };
+}
+function normalizeToolCounts(value) {
+    if (!value || typeof value !== 'object')
+        return undefined;
+    const counts = {};
+    for (const [name, count] of Object.entries(value)) {
+        if (typeof count === 'number' && Number.isFinite(count) && count > 0 && name.length <= ACTIVITY_NAME_MAX_LEN) {
+            counts[name] = Math.trunc(count);
+        }
+    }
+    return counts;
 }
 function readTranscriptCache(transcriptPath, state) {
     try {
@@ -345,6 +358,11 @@ export async function parseTranscript(transcriptPath) {
     let latestTodos = [];
     const taskIdToIndex = new Map();
     const queueCompletionMap = new Map();
+    // Background agents live in the Claude Code process: a startup/resume means
+    // the process that ran them is gone. Teammate agents report completion as an
+    // idle_notification message instead of a queue-operation.
+    let lastProcessStartAt;
+    const teammateIdle = [];
     let latestSlug;
     let customTitle;
     let latestAdvisorModel;
@@ -545,6 +563,22 @@ export async function parseTranscript(transcriptPath) {
                         prevMainChainAt = entryAt;
                     }
                 }
+                const entryAt = entry.timestamp ? new Date(entry.timestamp) : null;
+                if (entryAt && !Number.isNaN(entryAt.getTime())) {
+                    // `compact`/`clear` fire SessionStart inside the same process, so only
+                    // these two mean the background agents died with the old process.
+                    const hookName = entry.attachment?.hookName;
+                    if (entry.type === 'attachment' && (hookName === 'SessionStart:startup' || hookName === 'SessionStart:resume')) {
+                        lastProcessStartAt = entryAt;
+                    }
+                    const content = entry.message?.content;
+                    if (entry.type === 'user' && typeof content === 'string' && content.includes('<teammate-message')) {
+                        for (const m of content.matchAll(/<teammate-message teammate_id="([^"]+)"[^>]*>([\s\S]*?)<\/teammate-message>/g)) {
+                            if (m[2].includes('"idle_notification"'))
+                                teammateIdle.push({ name: m[1], at: entryAt });
+                        }
+                    }
+                }
                 processEntry(entry, toolMap, skillSet, mcpServerSet, mcpErrorSet, agentMap, taskIdToIndex, latestTodos, result);
             }
             catch (err) {
@@ -565,6 +599,24 @@ export async function parseTranscript(transcriptPath) {
         if (agent?.background) {
             agent.endTime = endTime;
             agent.status = 'completed';
+        }
+    }
+    // ponytail: a teammate woken again by SendMessage after going idle shows as
+    // completed until its next idle; tracking wake-ups needs the SendMessage calls.
+    for (const { name, at } of teammateIdle) {
+        for (const agent of agentMap.values()) {
+            if (agent.background && agent.status === 'running' && agent.name === name && agent.startTime <= at) {
+                agent.endTime = at;
+                agent.status = 'completed';
+            }
+        }
+    }
+    if (lastProcessStartAt) {
+        for (const agent of agentMap.values()) {
+            if (agent.background && agent.status === 'running' && agent.startTime < lastProcessStartAt) {
+                agent.endTime = lastProcessStartAt;
+                agent.status = 'completed';
+            }
         }
     }
     for (const agent of agentMap.values()) {
@@ -640,6 +692,7 @@ function processEntry(entry, toolMap, skillSet, mcpServerSet, mcpErrorSet, agent
                     type: input?.subagent_type ?? 'agent',
                     model: sanitizeTranscriptModel(input?.model),
                     description: input?.description ?? undefined,
+                    name: typeof input?.name === 'string' ? input.name : undefined,
                     status: 'running',
                     startTime: timestamp,
                     background: input?.run_in_background === true,
@@ -717,9 +770,19 @@ function processEntry(entry, toolMap, skillSet, mcpServerSet, mcpErrorSet, agent
             }
             else {
                 toolMap.set(block.id, toolEntry);
+                if (entry.isSidechain !== true) {
+                    const counts = result.toolCounts ?? (result.toolCounts = {});
+                    const countKey = normalizeActivityName(block.name) ?? block.name.slice(0, ACTIVITY_NAME_MAX_LEN);
+                    counts[countKey] = (counts[countKey] ?? 0) + 1;
+                }
             }
         }
         if (block.type === 'tool_result' && block.tool_use_id) {
+            const createdIndex = taskIdToIndex.get(block.tool_use_id);
+            const assignedTaskId = entry.toolUseResult?.task?.id;
+            if (createdIndex !== undefined && (typeof assignedTaskId === 'string' || typeof assignedTaskId === 'number')) {
+                taskIdToIndex.set(String(assignedTaskId), createdIndex);
+            }
             const tool = toolMap.get(block.tool_use_id);
             if (tool) {
                 tool.status = block.is_error ? 'error' : 'completed';
