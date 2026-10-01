@@ -48,6 +48,9 @@ Set `noEmit: true` and `types: ["bun"]`. Remove `outDir`, `declaration`, `declar
 ### Tests
 
 - All 34 test files that import `../dist/<x>.js` import `../src/<x>.js` instead. Bun resolves the `.js` specifier to the `.ts` file; this is verified in the tests task.
+- `tests/integration.test.js` spawns `node dist/index.js` 12 times; those become `spawnSync(process.execPath, ["src/index.ts"], …)` so no test needs Node.
+- `tests/build-output.test.js` asserts the compiled `dist/` output; it is deleted with `dist/`.
+- `tests/setup-command.test.js` counts the `stty` snippet in `commands/setup.md` (3 today, 1 after the Windows/Node paths go) and gains a test that setup only offers Bun.
 - Under `bun test` today (importing `dist/`): 1122 pass, 25 fail, 6 skip. The 25 failures and their fixes:
   1. **22 `countConfigs` / config-location tests**: Bun's `os.homedir()` reads `HOME` once at startup (measured: `HOME=/tmp/a bun -e "process.env.HOME='/tmp/changed'; os.homedir()"` → `/tmp/a`; Node → `/tmp/changed`). Tests set `process.env.HOME` at runtime. Fix: a `homeDir()` helper in `src/claude-config-dir.ts` returning `process.env.HOME || os.homedir()`, replacing the 12 `os.homedir()` calls in `src/`. Same result in the real statusline.
   2. **`index entrypoint runs when executed directly`**: `src/index.ts:263` compares `process.argv[1]` with `import.meta.url`'s path. Fix: `if (import.meta.main) void main();`. The test runs `bun src/index.ts` as a real subprocess and asserts the same observable output it asserts today.
