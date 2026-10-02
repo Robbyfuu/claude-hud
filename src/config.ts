@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getClaudeConfigDir, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
+import { expandHomeDirPrefix, getClaudeConfigDir, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { createDebug } from './debug.js';
 import type { Language } from './i18n/types.js';
 import { MAX_TERMINAL_WIDTH } from './utils/terminal.js';
@@ -60,6 +60,7 @@ export type HudElement =
   | 'context'
   | 'usage'
   | 'promptCache'
+  | 'cacheHitRate'
   | 'memory'
   | 'environment'
   | 'tools'
@@ -133,6 +134,7 @@ export const DEFAULT_ELEMENT_ORDER: HudElement[] = [
   'context',
   'usage',
   'promptCache',
+  'cacheHitRate',
   'memory',
   'environment',
   'tools',
@@ -181,6 +183,7 @@ export interface HudConfig {
     showDirty: boolean;
     showAheadBehind: boolean;
     showFileStats: boolean;
+    showWorktree: boolean;
     branchOverflow: GitBranchOverflowMode;
     pushWarningThreshold: number;
     pushCriticalThreshold: number;
@@ -213,6 +216,8 @@ export interface HudConfig {
     // Accumulate the native stdin cost into a per-day ledger and show
     // today's cumulative spend across sessions. Default off.
     showDailyCost: boolean;
+    // Show spend over the weekly quota window behind the `Weekly` usage bar. Default off.
+    showWeeklyCost: boolean;
     showDuration: boolean;
     showSpeed: boolean;
     showTokenBreakdown: boolean;
@@ -224,11 +229,15 @@ export interface HudConfig {
     // Show the per-model weekly windows (`rate_limits.model_scoped`, e.g. Fable)
     // next to the 5h/7d windows. Set to false to keep only 5h/7d. Default on.
     showModelScopedUsage: boolean;
+    // Colour usage windows by consumption pace (projected usage at reset) and
+    // mark amber/red pace with ▲. Default off.
+    usagePace: boolean;
     showTools: boolean;
     showSkills: boolean;
     showMcp: boolean;
     toolNameMaxLength: number;
     toolsMaxVisible: number;
+    skillsMaxVisible: number;
     showAgents: boolean;
     showTodos: boolean;
     showSessionName: boolean;
@@ -248,6 +257,8 @@ export interface HudConfig {
     // Compatibility fallback used only until transcript tier detection has a
     // real 5-minute or 1-hour cache write to follow.
     promptCacheTtlSeconds: number;
+    // Show the session's prompt-cache hit rate as `Cache hit X%`. Default off.
+    showCacheHitRate: boolean;
     showSessionTokens: boolean;
     showOutputStyle: boolean;
     showSessionStartDate: boolean;
@@ -318,6 +329,7 @@ export const DEFAULT_CONFIG: HudConfig = {
     showDirty: true,
     showAheadBehind: false,
     showFileStats: false,
+    showWorktree: false,
     branchOverflow: 'truncate',
     pushWarningThreshold: 0,
     pushCriticalThreshold: 0,
@@ -343,6 +355,7 @@ export const DEFAULT_CONFIG: HudConfig = {
     showCost: false,
     showRoutedCost: false,
     showDailyCost: false,
+    showWeeklyCost: false,
     showDuration: false,
     showSpeed: false,
     showTokenBreakdown: true,
@@ -352,11 +365,13 @@ export const DEFAULT_CONFIG: HudConfig = {
     showResetLabel: true,
     usageCompact: false,
     showModelScopedUsage: true,
+    usagePace: false,
     showTools: false,
     showSkills: false,
     showMcp: false,
     toolNameMaxLength: 0,
     toolsMaxVisible: 4,
+    skillsMaxVisible: 4,
     showAgents: false,
     showTodos: false,
     showSessionName: false,
@@ -369,6 +384,7 @@ export const DEFAULT_CONFIG: HudConfig = {
     showMemoryUsage: false,
     showPromptCache: false,
     promptCacheTtlSeconds: 300,
+    showCacheHitRate: false,
     showSessionTokens: false,
     showOutputStyle: false,
     showSessionStartDate: false,
@@ -716,8 +732,13 @@ function validateAutoCompactWindow(value: unknown): number | null {
   return value;
 }
 
+// Unset variables are left as written.
 function validateOptionalPath(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return expandHomeDirPrefix(value.trim(), getHomeDir())
+    .replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name: string) => process.env[name] ?? match);
 }
 
 function validateDisplayText(value: unknown, maxLength: number, fallback: string): string {
@@ -775,6 +796,9 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
     showFileStats: typeof migrated.gitStatus?.showFileStats === 'boolean'
       ? migrated.gitStatus.showFileStats
       : DEFAULT_CONFIG.gitStatus.showFileStats,
+    showWorktree: typeof migrated.gitStatus?.showWorktree === 'boolean'
+      ? migrated.gitStatus.showWorktree
+      : DEFAULT_CONFIG.gitStatus.showWorktree,
     branchOverflow: validateGitBranchOverflow(migrated.gitStatus?.branchOverflow)
       ? migrated.gitStatus.branchOverflow
       : DEFAULT_CONFIG.gitStatus.branchOverflow,
@@ -839,6 +863,9 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
     showDailyCost: typeof migrated.display?.showDailyCost === 'boolean'
       ? migrated.display.showDailyCost
       : DEFAULT_CONFIG.display.showDailyCost,
+    showWeeklyCost: typeof migrated.display?.showWeeklyCost === 'boolean'
+      ? migrated.display.showWeeklyCost
+      : DEFAULT_CONFIG.display.showWeeklyCost,
     showDuration: typeof migrated.display?.showDuration === 'boolean'
       ? migrated.display.showDuration
       : DEFAULT_CONFIG.display.showDuration,
@@ -866,6 +893,9 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
     showModelScopedUsage: typeof migrated.display?.showModelScopedUsage === 'boolean'
       ? migrated.display.showModelScopedUsage
       : DEFAULT_CONFIG.display.showModelScopedUsage,
+    usagePace: typeof migrated.display?.usagePace === 'boolean'
+      ? migrated.display.usagePace
+      : DEFAULT_CONFIG.display.usagePace,
     showTools: typeof migrated.display?.showTools === 'boolean'
       ? migrated.display.showTools
       : DEFAULT_CONFIG.display.showTools,
@@ -882,6 +912,10 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
     toolsMaxVisible: validateNonNegativeInteger(
       migrated.display?.toolsMaxVisible,
       DEFAULT_CONFIG.display.toolsMaxVisible,
+    ),
+    skillsMaxVisible: validateNonNegativeInteger(
+      migrated.display?.skillsMaxVisible,
+      DEFAULT_CONFIG.display.skillsMaxVisible,
     ),
     showAgents: typeof migrated.display?.showAgents === 'boolean'
       ? migrated.display.showAgents
@@ -921,6 +955,9 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
       migrated.display?.promptCacheTtlSeconds,
       DEFAULT_CONFIG.display.promptCacheTtlSeconds,
     ),
+    showCacheHitRate: typeof migrated.display?.showCacheHitRate === 'boolean'
+      ? migrated.display.showCacheHitRate
+      : DEFAULT_CONFIG.display.showCacheHitRate,
     showSessionTokens: typeof migrated.display?.showSessionTokens === 'boolean'
       ? migrated.display.showSessionTokens
       : DEFAULT_CONFIG.display.showSessionTokens,
