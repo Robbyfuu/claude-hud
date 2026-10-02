@@ -127,3 +127,20 @@ test('parseTranscript counts every tool use and maps task ids Claude Code assign
     assert.deepEqual(result.todos.map((todo) => todo.status), ['pending', 'completed']);
   });
 });
+
+test('parseTranscript does not count agent, todo and task-management tools in toolCounts', async () => {
+  const entries = [
+    toolUse('a1', 'Agent', { description: 'x' }),
+    toolUse('a2', 'Task', { description: 'x' }),
+    toolUse('t1', 'TodoWrite', { todos: [] }),
+    toolUse('c1', 'TaskCreate', { subject: 'x' }),
+    toolUse('u1', 'TaskUpdate', { taskId: '1', status: 'completed' }),
+    toolUse('b1', 'Bash', { command: 'ls' }),
+    toolUse('b2', 'Bash', { command: 'ls' }),
+  ];
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'main.jsonl');
+    await writeJsonl(file, entries);
+    assert.deepEqual((await parseTranscript(file)).toolCounts, { Bash: 2 });
+  });
+});

@@ -240,10 +240,6 @@ class Parser {
 
   private toolUse(block: Block, at: Date, sidechain: boolean): void {
     const toolName = block.name as string;
-    if (!sidechain) {
-      const key = name(toolName) ?? toolName.slice(0, NAME_MAX_LEN);
-      this.toolCounts[key] = (this.toolCounts[key] ?? 0) + 1;
-    }
     const input = block.input;
     const skill = toolName === 'Skill' ? name(input?.skill) : undefined;
     if (skill) this.skills.add(skill);
@@ -283,6 +279,11 @@ class Parser {
         status: 'running',
         startTime: at,
       });
+      // Agent, todo and task-management tools are not counted, matching the panel's tools row.
+      if (!sidechain) {
+        const key = name(toolName) ?? toolName.slice(0, NAME_MAX_LEN);
+        this.toolCounts[key] = (this.toolCounts[key] ?? 0) + 1;
+      }
     }
   }
 
