@@ -55,6 +55,7 @@ async function runCase(spec) {
       await copyDir(path.join(goldenDir, 'subagents'), path.join(projectDir, 'golden-session', 'subagents'));
       await copyDir(path.join(goldenDir, 'agents'), path.join(configDir, 'agents'), (n) => n.endsWith('.md'));
     }
+    if (spec.setup) await spec.setup({ projectDir, transcript });
     const pluginDir = path.join(configDir, 'plugins', 'claude-hud');
     await mkdir(pluginDir, { recursive: true });
     if (spec.config) {
@@ -165,4 +166,46 @@ test('every panel line has the same width, sized to the terminal', async () => {
     const expected = Math.max(40, Math.min(180, (c.columns ?? 120) - 4));
     assert.deepEqual(lines.map((l) => Bun.stringWidth(l)), lines.map(() => expected), c.name);
   }
+});
+
+const jsonl = (...entries) => entries.map((e) => JSON.stringify(e)).join('\n') + '\n';
+const assistantUsage = (id, usage, extra = {}) => ({
+  type: 'assistant',
+  timestamp: '2026-10-01T11:30:00.000Z',
+  ...extra,
+  message: { id, role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'text', text: 'ok' }], usage },
+});
+
+test("main adds subagent token totals to the panel's session token total", async () => {
+  // Main: 12k tokens, 9k read from cache. Subagent: 30k tokens, 6k from cache.
+  // Sum: 42k tokens, 15k/42k = 36% cache. Either file alone shows 12k or 30k.
+  const { raw } = await runCase({
+    name: 'subagent-token-wiring',
+    stdin: {
+      session_id: 'golden-session',
+      transcript_path: '<TRANSCRIPT>',
+      cwd: '<PROJECT>',
+      model: { id: 'claude-opus-5-5', display_name: 'Opus 5.5' },
+      context_window: { context_window_size: 200_000, used_percentage: 10, current_usage: { input_tokens: 20_000 } },
+    },
+    config: { lineLayout: 'panel' },
+    columns: 140,
+    transcript: null,
+    async setup({ projectDir, transcript }) {
+      await writeFile(transcript, jsonl(assistantUsage('msg_main', {
+        input_tokens: 1_000, output_tokens: 1_000, cache_creation_input_tokens: 1_000, cache_read_input_tokens: 9_000,
+      })));
+      const subagents = path.join(projectDir, 'golden-session', 'subagents');
+      await mkdir(subagents, { recursive: true });
+      await writeFile(path.join(subagents, 'agent-x.meta.json'), JSON.stringify({ toolUseId: 'toolu_x' }));
+      await writeFile(path.join(subagents, 'agent-x.jsonl'), jsonl(assistantUsage('msg_sub', {
+        input_tokens: 10_000, output_tokens: 10_000, cache_creation_input_tokens: 4_000, cache_read_input_tokens: 6_000,
+      }, { isSidechain: true })));
+    },
+  });
+  // eslint-disable-next-line no-control-regex
+  const plain = raw.replace(/\x1b\[[0-9;]*m/g, '');
+  const session = plain.split('\n').find((line) => line.includes(' tok'));
+  assert.ok(session, `a token segment in:\n${plain}`);
+  assert.match(session, /· 42k tok \(36% cache\)/);
 });

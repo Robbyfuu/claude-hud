@@ -71,7 +71,7 @@ const MAX_RECENT_COMPLETED = 2;
 const COMPLETED_RETENTION_MS = 60_000;
 
 /** `claude-haiku-4-5-20251001` → `haiku-4.5`; aliases and unknown IDs pass through. */
-function shortModel(model: string | undefined): string | undefined {
+export function shortModel(model: string | undefined): string | undefined {
   const cleaned = model ? sanitizeDisplayText(model).trim() : '';
   if (!cleaned) return undefined;
   const id = cleaned.replace(/\[[^\]]*\]$/, '');

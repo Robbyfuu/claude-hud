@@ -1,19 +1,21 @@
 import * as path from 'node:path';
-import type { HudConfig } from '../config.js';
-import type { AgentEntry, RenderContext, SubagentDetail } from '../types.js';
-import { getBufferedPercent, getContextPercent, getModelName, getTotalTokens, stripContextSuffix } from '../stdin.js';
+import type { AgentEntry, SubagentDetail } from '../types.js';
+import { getModelName, stripContextSuffix } from '../stdin.js';
 import { getCanonicalLanguage, interpolate, t } from '../i18n/index.js';
 import type { MessageKey } from '../i18n/types.js';
 import { sanitizeDisplayText } from '../utils/sanitize.js';
-import { formatResetTime } from './format-reset-time.js';
-import { formatAgentModel } from './agents-line.js';
-import { codePointCellWidth, isCjkAmbiguousWide } from './width.js';
-import { RESET } from './colors.js';
+import { formatSessionDuration } from '../utils/format.js';
 import { selectPanelAgents } from '../subagents.js';
+import { shortModel } from './activity.js';
+import { sliceToWidth, textWidth } from './ansi.js';
+import { RESET } from './colors.js';
+import { contextUsage } from './derive.js';
+import type { Frame } from './frame.js';
+import { formatResetTime, wallClock } from './time.js';
 
 // "panel" layout: boxed session / usage / environment panes over an activity
 // pane with a per-agent table. Every line is sized to the terminal width
-// up front, so render() prints these lines as-is instead of wrapping them.
+// up front, so renderLines() returns them as-is instead of wrapping them.
 
 const PALETTE = {
   border: '#3A3150',
@@ -69,18 +71,8 @@ type Line = Seg[];
 const s = (text: string, color?: string, bold = false): Seg => ({ text, color, bold });
 const sp = (n: number): Seg => ({ text: ' '.repeat(Math.max(0, n)) });
 
-let ambiguousWide = false;
-
-function cellWidth(text: string): number {
-  let width = 0;
-  for (const ch of text) {
-    width += codePointCellWidth(ch.codePointAt(0) ?? 0, ambiguousWide);
-  }
-  return width;
-}
-
 function lineWidth(line: Line): number {
-  return line.reduce((sum, seg) => sum + cellWidth(seg.text), 0);
+  return line.reduce((sum, seg) => sum + textWidth(seg.text), 0);
 }
 
 function truncate(line: Line, max: number): Line {
@@ -90,18 +82,13 @@ function truncate(line: Line, max: number): Line {
   let used = 0;
   const budget = max - 1; // room for the ellipsis
   for (const seg of line) {
-    let text = '';
-    for (const ch of seg.text) {
-      const w = codePointCellWidth(ch.codePointAt(0) ?? 0, ambiguousWide);
-      if (used + w > budget) break;
-      text += ch;
-      used += w;
-    }
+    const text = sliceToWidth(seg.text, budget - used);
     if (text) out.push({ ...seg, text });
     if (text.length < seg.text.length) {
       out.push({ ...seg, text: '…' });
       return out;
     }
+    used += textWidth(text);
   }
   return out;
 }
@@ -169,11 +156,15 @@ function formatWindowSize(size: number): string {
   return `${Math.round(size / 1000)}k`;
 }
 
-function formatWeeklyReset(resetAt: Date | null, now: Date): string {
+// The panel shows reset times relative ("1h 30m"), which ignore the wall-clock options.
+const relativeReset = (resetAt: Date | null, now: number): string =>
+  formatResetTime(resetAt, 'relative', wallClock(undefined), now);
+
+function formatWeeklyReset(resetAt: Date | null, now: number): string {
   if (!resetAt) return '';
-  const diff = resetAt.getTime() - now.getTime();
+  const diff = resetAt.getTime() - now;
   if (diff <= 0) return '';
-  if (diff < 24 * 3600 * 1000) return formatResetTime(resetAt, 'relative');
+  if (diff < 24 * 3600 * 1000) return relativeReset(resetAt, now);
   const locale = getCanonicalLanguage();
   const weekday = resetAt.toLocaleDateString(locale, { weekday: 'short' }).replace(/\.$/, '');
   const time = resetAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -196,10 +187,10 @@ function label(key: MessageKey): string {
 function box(title: string, titleColor: string, rows: Line[], width: number, height: number): string[] {
   const inner = Math.max(1, width - 4);
   let titleText = title;
-  if (cellWidth(titleText) > width - 6) {
+  if (textWidth(titleText) > width - 6) {
     titleText = toPlain(truncate([s(titleText)], Math.max(1, width - 6)));
   }
-  const fill = Math.max(1, width - 5 - cellWidth(titleText));
+  const fill = Math.max(1, width - 5 - textWidth(titleText));
   const top: Line = [
     s('╭─ ', PALETTE.border),
     s(titleText, titleColor, true),
@@ -230,40 +221,35 @@ function sideBySide(columns: string[][]): string[] {
 // ---------------------------------------------------------------------------
 // Pane contents
 
-function withIcon(ctx: RenderContext, icon: keyof typeof NERD_ICONS, color: string, rest: Line): Line {
-  if (ctx.config?.panel?.icons !== 'nerd') return rest;
+function withIcon(f: Frame, icon: keyof typeof NERD_ICONS, color: string, rest: Line): Line {
+  if (f.config?.panel?.icons !== 'nerd') return rest;
   return [s(NERD_ICONS[icon], color), sp(1), ...rest];
 }
 
-function projectLabel(ctx: RenderContext): string {
-  const cwd = ctx.stdin.workspace?.project_dir ?? ctx.stdin.cwd ?? ctx.stdin.workspace?.current_dir;
+function projectLabel(f: Frame): string {
+  const cwd = f.stdin.workspace?.project_dir ?? f.stdin.cwd ?? f.stdin.workspace?.current_dir;
   if (!cwd) return '';
-  const levels = ctx.config?.pathLevels ?? 1;
+  const levels = f.config?.pathLevels ?? 1;
   if (levels === 'full') return clean(cwd);
   const parts = path.resolve(cwd).split(path.sep).filter(Boolean);
   return clean(parts.slice(-levels).join('/'), '/');
 }
 
-function contextLevel(ctx: RenderContext): { percent: number; warning: number; critical: number } {
-  const display = ctx.config?.display;
-  const autoCompactWindow = display?.autoCompactWindow ?? null;
-  const percent = display?.autocompactBuffer === 'disabled'
-    ? getContextPercent(ctx.stdin, autoCompactWindow)
-    : getBufferedPercent(ctx.stdin, autoCompactWindow);
+function contextLevel(f: Frame): { percent: number; tokens: number; size: number; warning: number; critical: number } {
+  const display = f.config?.display;
   return {
-    percent,
+    ...contextUsage(f),
     warning: display?.contextWarningThreshold ?? 70,
     critical: display?.contextCriticalThreshold ?? 85,
   };
 }
 
 /** One "start a new session" hint, highest priority first; null when none applies. */
-function adviceRow(ctx: RenderContext): Line | null {
-  const { percent, warning, critical } = contextLevel(ctx);
+function adviceRow(f: Frame): Line | null {
+  const { percent, tokens, warning, critical } = contextLevel(f);
   const context = `${label('panel.context')} ${percent}%`;
   if (percent >= critical) return [s(`↻ ${label('panel.adviceNow')} · ${context}`, PALETTE.red)];
-  const tokens = getTotalTokens(ctx.stdin);
-  if (ctx.stdin.prompt_cache?.warm === false && tokens >= COLD_CACHE_REWRITE_MIN_TOKENS) {
+  if (f.stdin.prompt_cache?.warm === false && tokens >= COLD_CACHE_REWRITE_MIN_TOKENS) {
     const rewrite = interpolate(label('panel.adviceColdCache'), { tokens: formatCount(tokens) });
     return [s(`↻ ${label('panel.adviceNow')} · ${rewrite}`, PALETTE.amber)];
   }
@@ -271,8 +257,8 @@ function adviceRow(ctx: RenderContext): Line | null {
   return null;
 }
 
-function sessionRows(ctx: RenderContext): Line[] {
-  const { stdin } = ctx;
+function sessionRows(f: Frame): Line[] {
+  const { stdin } = f;
   const rawName = clean(getModelName(stdin), 'Claude');
   const suffix = rawName.match(/\(([^)]*)\bcontext\b[^)]*\)/i);
   const size = stdin.context_window?.context_window_size ?? 0;
@@ -283,15 +269,15 @@ function sessionRows(ctx: RenderContext): Line[] {
   if (windowLabel) modelRow.push(s(` · ${windowLabel}`, PALETTE.dim));
   if (effort) modelRow.push(s(` · ${clean(effort)}`, PALETTE.dim));
 
-  const projectRow: Line = [s(projectLabel(ctx) || '—', PALETTE.bright)];
+  const projectRow: Line = [s(projectLabel(f) || '—', PALETTE.bright)];
   const addedDirs = stdin.workspace?.added_dirs?.length ?? 0;
   if (addedDirs > 0) projectRow.push(s(` +${addedDirs}`, PALETTE.dim));
   if (stdin.workspace?.git_worktree) {
-    const worktreeGlyph = ctx.config?.panel?.icons === 'nerd' ? NERD_ICONS.worktree : '⎇';
+    const worktreeGlyph = f.config?.panel?.icons === 'nerd' ? NERD_ICONS.worktree : '⎇';
     projectRow.push(s(` ${worktreeGlyph} ${clean(stdin.workspace.git_worktree)}`, PALETTE.dim));
   }
 
-  const git = ctx.gitStatus;
+  const git = f.gitStatus;
   let branchRow: Line;
   if (git) {
     branchRow = [s(clean(git.branch, 'HEAD'), PALETTE.pink)];
@@ -309,16 +295,17 @@ function sessionRows(ctx: RenderContext): Line[] {
 
   const cost = stdin.cost;
   const durationMs = cost?.total_duration_ms;
+  const sessionStart = f.transcript.sessionStart?.getTime();
   const duration = typeof durationMs === 'number' && durationMs > 0
     ? formatDuration(durationMs).replace(/ \d+s$/, '')
-    : ctx.sessionDuration;
+    : sessionStart === undefined ? '' : formatSessionDuration(f.now - sessionStart);
   const statsRow: Line = [s(duration || '—', PALETTE.bright)];
   if (typeof cost?.total_cost_usd === 'number') {
     statsRow.push(s(' · ', PALETTE.dim), s(`$${cost.total_cost_usd.toFixed(2)}`, PALETTE.amber));
   }
   let total = 0;
   let cacheRead = 0;
-  for (const tokens of [ctx.transcript.sessionTokens, ctx.subagentTokens]) {
+  for (const tokens of [f.transcript.sessionTokens, f.subagentTokens]) {
     if (!tokens) continue;
     total += tokens.inputTokens + tokens.outputTokens + tokens.cacheCreationTokens + tokens.cacheReadTokens;
     cacheRead += tokens.cacheReadTokens;
@@ -337,20 +324,19 @@ function sessionRows(ctx: RenderContext): Line[] {
   }
 
   const rows = [
-    withIcon(ctx, 'model', PALETTE.violet, modelRow),
-    withIcon(ctx, 'folder', PALETTE.pink, projectRow),
-    withIcon(ctx, 'branch', PALETTE.pink, branchRow),
-    withIcon(ctx, 'clock', PALETTE.dim, statsRow),
+    withIcon(f, 'model', PALETTE.violet, modelRow),
+    withIcon(f, 'folder', PALETTE.pink, projectRow),
+    withIcon(f, 'branch', PALETTE.pink, branchRow),
+    withIcon(f, 'clock', PALETTE.dim, statsRow),
   ];
-  const advice = adviceRow(ctx);
+  const advice = adviceRow(f);
   if (advice) rows.push(advice);
   return rows;
 }
 
-function usageRows(ctx: RenderContext, innerWidth: number): Line[] {
-  const display = ctx.config?.display;
+function usageRows(f: Frame, innerWidth: number): Line[] {
   const labels = [label('panel.context'), label('panel.fiveHour'), label('panel.weekly'), label('panel.tasks')];
-  const labelWidth = Math.min(12, Math.max(...labels.map(cellWidth)));
+  const labelWidth = Math.min(12, Math.max(...labels.map(textWidth)));
   // Leave ~14 cells after the value for the reset time or token count.
   const barWidth = Math.max(6, Math.min(24, innerWidth - labelWidth - 1 - 1 - 5 - 1 - 14));
 
@@ -364,24 +350,18 @@ function usageRows(ctx: RenderContext, innerWidth: number): Line[] {
     ...extra,
   ];
   const empty = (): Seg[] => [s(BAR_CELL.repeat(barWidth), PALETTE.faint)];
-  const resetGlyph = ctx.config?.panel?.icons === 'nerd' ? NERD_ICONS.reset : '↻';
+  const resetGlyph = f.config?.panel?.icons === 'nerd' ? NERD_ICONS.reset : '↻';
 
   // Context
-  const autoCompactWindow = display?.autoCompactWindow ?? null;
-  const { percent, warning, critical } = contextLevel(ctx);
+  const { percent, tokens, size: windowSize, warning, critical } = contextLevel(f);
   const ctxColor = percent >= critical ? PALETTE.red : percent >= warning ? PALETTE.amber : PALETTE.cyan;
-  const windowSize = typeof autoCompactWindow === 'number' && autoCompactWindow > 0
-    ? autoCompactWindow
-    : ctx.stdin.context_window?.context_window_size ?? 0;
-  const tokens = getTotalTokens(ctx.stdin);
   const ctxExtra: Line = percent >= critical
     ? [s(label('panel.compact'), PALETTE.red, true)]
     : windowSize > 0 ? [s(`${formatCount(tokens)}/${formatWindowSize(windowSize)}`, PALETTE.dim)] : [];
   const contextRow = row(labels[0], bar(percent, barWidth, ctxColor), s(`${percent}%`, ctxColor, true), ctxExtra);
 
   // Usage windows
-  const usage = ctx.usageData;
-  const now = new Date();
+  const usage = f.usageData;
   const windowRow = (name: string, value: number | null | undefined, base: string, reset: string): Line => {
     if (typeof value !== 'number') return row(name, empty(), s('—', PALETTE.dim), []);
     const pct = Math.round(Math.min(100, Math.max(0, value)));
@@ -392,17 +372,17 @@ function usageRows(ctx: RenderContext, innerWidth: number): Line[] {
     labels[1],
     usage?.fiveHour,
     PALETTE.violet,
-    formatResetTime(usage?.fiveHourResetAt ?? null, 'relative'),
+    relativeReset(usage?.fiveHourResetAt ?? null, f.now),
   );
   const weeklyRow = windowRow(
     labels[2],
     usage?.sevenDay,
     PALETTE.pink,
-    formatWeeklyReset(usage?.sevenDayResetAt ?? null, now),
+    formatWeeklyReset(usage?.sevenDayResetAt ?? null, f.now),
   );
 
   // Main-session task list
-  const todos = ctx.transcript.todos ?? [];
+  const todos = f.transcript.todos ?? [];
   const done = todos.filter((todo) => todo.status === 'completed').length;
   let tasksRow: Line;
   if (todos.length === 0) {
@@ -420,17 +400,17 @@ function usageRows(ctx: RenderContext, innerWidth: number): Line[] {
   return [contextRow, fiveHourRow, weeklyRow, tasksRow];
 }
 
-function environmentCounts(ctx: RenderContext): Array<[string, number]> {
+function environmentCounts(f: Frame): Array<[string, number]> {
   return [
-    ['CLAUDE.md', ctx.claudeMdCount],
-    [label('panel.rules'), ctx.rulesCount],
-    ['MCP', ctx.mcpCount],
-    [label('panel.hooks'), ctx.hooksCount],
+    ['CLAUDE.md', f.claudeMdCount],
+    [label('panel.rules'), f.rulesCount],
+    ['MCP', f.mcpCount],
+    [label('panel.hooks'), f.hooksCount],
   ];
 }
 
-function environmentRows(ctx: RenderContext, innerWidth: number): Line[] {
-  const counts = environmentCounts(ctx);
+function environmentRows(f: Frame, innerWidth: number): Line[] {
+  const counts = environmentCounts(f);
   const cell = Math.max(8, Math.floor((innerWidth - 2) / 2));
   const pair = (a: [string, number], b: [string, number]): Line => [
     ...fit([s(a[0], PALETTE.dim)], cell - 3),
@@ -442,7 +422,7 @@ function environmentRows(ctx: RenderContext, innerWidth: number): Line[] {
 
   const rows: Line[] = [pair(counts[0], counts[1]), pair(counts[2], counts[3])];
 
-  const cache = ctx.stdin.prompt_cache;
+  const cache = f.stdin.prompt_cache;
   if (cache && typeof cache.hit_ratio === 'number') {
     rows.push([
       s(label('panel.cache'), PALETTE.dim),
@@ -456,8 +436,8 @@ function environmentRows(ctx: RenderContext, innerWidth: number): Line[] {
   }
 
   const meta: Line = [];
-  if (ctx.stdin.version) meta.push(s(`v${clean(ctx.stdin.version)}`, PALETTE.dim));
-  const style = clean(ctx.stdin.output_style?.name ?? ctx.outputStyle);
+  if (f.stdin.version) meta.push(s(`v${clean(f.stdin.version)}`, PALETTE.dim));
+  const style = clean(f.stdin.output_style?.name);
   if (style && style !== 'default') {
     if (meta.length > 0) meta.push(s(' · ', PALETTE.dim));
     meta.push(s(style, PALETTE.dim));
@@ -466,9 +446,9 @@ function environmentRows(ctx: RenderContext, innerWidth: number): Line[] {
   return rows;
 }
 
-function environmentInline(ctx: RenderContext): Line {
+function environmentInline(f: Frame): Line {
   const line: Line = [s(label('panel.environment'), PALETTE.dim), sp(2)];
-  environmentCounts(ctx).forEach(([name, count], i) => {
+  environmentCounts(f).forEach(([name, count], i) => {
     if (i > 0) line.push(s(' · ', PALETTE.dim));
     line.push(s(String(count), PALETTE.bright, true), s(` ${name}`, PALETTE.dim));
   });
@@ -485,12 +465,12 @@ function fitSkills(skills: string[], width: number, color: string): Line {
     const rest = skills.length - count;
     const suffix = rest > 0 ? ` +${rest}` : '';
     const text = skills.slice(0, count).join(' · ');
-    if (cellWidth(text) + cellWidth(suffix) <= width) {
+    if (textWidth(text) + textWidth(suffix) <= width) {
       return rest > 0 ? [s(text, color), s(suffix, PALETTE.dim)] : [s(text, color)];
     }
   }
   const suffix = skills.length > 1 ? ` +${skills.length - 1}` : '';
-  return [...truncate([s(skills[0], color)], width - cellWidth(suffix)), s(suffix, PALETTE.dim)];
+  return [...truncate([s(skills[0], color)], width - textWidth(suffix)), s(suffix, PALETTE.dim)];
 }
 
 interface AgentCells {
@@ -512,7 +492,7 @@ function agentCells(agent: AgentEntry, detail: SubagentDetail | undefined, now: 
   const name = clean(agent.name) || rawType.slice(rawType.lastIndexOf(':') + 1) || 'agent';
 
   const task: Line = [s(clean(agent.description, '—'), running ? PALETTE.bright : PALETTE.dim)];
-  const model = formatAgentModel(agent.model);
+  const model = shortModel(agent.model);
   if (model) task.push(s(` · ${model}`, PALETTE.dim));
 
   const skills = (width: number): Line => fitSkills(detail?.skills ?? [], width, running ? PALETTE.green : PALETTE.dim);
@@ -621,8 +601,8 @@ function planColumns(innerWidth: number): Column[] | null {
   return null;
 }
 
-function agentTable(ctx: RenderContext, innerWidth: number, now: number): Line[] {
-  const { shown, hiddenRunning } = selectPanelAgents(ctx.transcript.agents ?? [], ctx.config, now);
+function agentTable(f: Frame, innerWidth: number): Line[] {
+  const { shown, hiddenRunning } = selectPanelAgents(f.transcript.agents ?? [], f.config, f.now);
   if (shown.length === 0) return [];
 
   const lines: Line[] = [[s('┈'.repeat(innerWidth), PALETTE.faint)]];
@@ -636,7 +616,7 @@ function agentTable(ctx: RenderContext, innerWidth: number, now: number): Line[]
     });
     lines.push(header);
     for (const agent of shown) {
-      const cells = agentCells(agent, ctx.subagents?.get(agent.id), now);
+      const cells = agentCells(agent, f.subagents?.get(agent.id), f.now);
       const row: Line = [];
       columns.forEach((c, i) => {
         if (i > 0) row.push(sp(COLUMN_GAP));
@@ -648,7 +628,7 @@ function agentTable(ctx: RenderContext, innerWidth: number, now: number): Line[]
   } else {
     // Narrow terminals: two lines per agent.
     for (const agent of shown) {
-      const cells = agentCells(agent, ctx.subagents?.get(agent.id), now);
+      const cells = agentCells(agent, f.subagents?.get(agent.id), f.now);
       const right: Line = [...cells.progress, sp(2), ...cells.time];
       const leftWidth = Math.max(8, innerWidth - lineWidth(right) - 1);
       lines.push([...fit(cells.agent, leftWidth), sp(1), ...truncate(right, innerWidth - leftWidth - 1)]);
@@ -665,8 +645,8 @@ function agentTable(ctx: RenderContext, innerWidth: number, now: number): Line[]
   return lines;
 }
 
-function activityRows(ctx: RenderContext, innerWidth: number, includeEnvironment: boolean, now: number): Line[] {
-  const agents = ctx.transcript.agents ?? [];
+function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean): Line[] {
+  const agents = f.transcript.agents ?? [];
   const runningCount = agents.filter((a) => a.status === 'running').length;
   const doneCount = agents.length - runningCount;
 
@@ -678,7 +658,7 @@ function activityRows(ctx: RenderContext, innerWidth: number, includeEnvironment
     right.push(s(` · ${interpolate(label(doneKey), { count: doneCount })}`, PALETTE.dim));
   }
 
-  const counts = Object.entries(ctx.transcript.toolCounts ?? {})
+  const counts = Object.entries(f.transcript.toolCounts ?? {})
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const toolsLabel = label('panel.tools');
   const leftBudget = innerWidth - lineWidth(right) - (right.length > 0 ? 2 : 0);
@@ -692,7 +672,7 @@ function activityRows(ctx: RenderContext, innerWidth: number, includeEnvironment
       const shortName = name.startsWith('mcp__') ? name.split('__').slice(1).join(':') : name;
       const item: Line = [s(clean(shortName), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
       const remaining = counts.length - i - 1;
-      const moreWidth = remaining > 0 ? cellWidth(`  +${remaining}`) : 0;
+      const moreWidth = remaining > 0 ? textWidth(`  +${remaining}`) : 0;
       const itemWidth = lineWidth(item) + (i > 0 ? 2 : 0);
       if (used + itemWidth + moreWidth > leftBudget) {
         left.push(s(`  +${counts.length - i}`, PALETTE.dim));
@@ -709,18 +689,16 @@ function activityRows(ctx: RenderContext, innerWidth: number, includeEnvironment
     : left;
 
   const rows: Line[] = [firstLine];
-  if (includeEnvironment) rows.push(environmentInline(ctx));
-  rows.push(...agentTable(ctx, innerWidth, now));
+  if (includeEnvironment) rows.push(environmentInline(f));
+  rows.push(...agentTable(f, innerWidth));
   return rows;
 }
 
 // ---------------------------------------------------------------------------
 
-export function renderPanel(ctx: RenderContext, terminalWidth: number | null): string[] {
-  ambiguousWide = isCjkAmbiguousWide();
-  const now = Date.now();
-  const columns = terminalWidth ?? DEFAULT_WIDTH;
-  const width = Math.max(40, Math.min(MAX_PANEL_WIDTH, ctx.config?.maxWidth ?? MAX_PANEL_WIDTH, columns - EDGE_MARGIN));
+export function panelLines(f: Frame): string[] {
+  const columns = f.width ?? DEFAULT_WIDTH;
+  const width = Math.max(40, Math.min(MAX_PANEL_WIDTH, f.config?.maxWidth ?? MAX_PANEL_WIDTH, columns - EDGE_MARGIN));
 
   const titles = {
     session: label('panel.session'),
@@ -731,7 +709,7 @@ export function renderPanel(ctx: RenderContext, terminalWidth: number | null): s
 
   let top: string[];
   let environmentInActivity = false;
-  const session = sessionRows(ctx);
+  const session = sessionRows(f);
   // 4 rows, or 5 when the session box carries the advice row.
   const topHeight = session.length;
 
@@ -742,8 +720,8 @@ export function renderPanel(ctx: RenderContext, terminalWidth: number | null): s
     const usageWidth = available - sessionWidth - envWidth;
     top = sideBySide([
       box(titles.session, PALETTE.violet, session, sessionWidth, topHeight),
-      box(titles.usage, PALETTE.cyan, usageRows(ctx, usageWidth - 4), usageWidth, topHeight),
-      box(titles.environment, PALETTE.pink, environmentRows(ctx, envWidth - 4), envWidth, topHeight),
+      box(titles.usage, PALETTE.cyan, usageRows(f, usageWidth - 4), usageWidth, topHeight),
+      box(titles.environment, PALETTE.pink, environmentRows(f, envWidth - 4), envWidth, topHeight),
     ]);
   } else if (width >= MEDIUM_MIN) {
     const available = width - 1;
@@ -751,17 +729,17 @@ export function renderPanel(ctx: RenderContext, terminalWidth: number | null): s
     const usageWidth = available - sessionWidth;
     top = sideBySide([
       box(titles.session, PALETTE.violet, session, sessionWidth, topHeight),
-      box(titles.usage, PALETTE.cyan, usageRows(ctx, usageWidth - 4), usageWidth, topHeight),
+      box(titles.usage, PALETTE.cyan, usageRows(f, usageWidth - 4), usageWidth, topHeight),
     ]);
     environmentInActivity = true;
   } else {
     top = [
       ...box(titles.session, PALETTE.violet, session, width, topHeight),
-      ...box(titles.usage, PALETTE.cyan, usageRows(ctx, width - 4), width, topHeight),
+      ...box(titles.usage, PALETTE.cyan, usageRows(f, width - 4), width, topHeight),
     ];
     environmentInActivity = true;
   }
 
-  const activity = activityRows(ctx, width - 4, environmentInActivity, now);
+  const activity = activityRows(f, width - 4, environmentInActivity);
   return [...top, ...box(titles.activity, PALETTE.amber, activity, width, activity.length)];
 }

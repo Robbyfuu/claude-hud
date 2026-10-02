@@ -5,10 +5,13 @@ import { wrapToWidth } from './ansi.js';
 import { compactLines } from './compact.js';
 import { expandedLines } from './expanded.js';
 import { createFrame } from './frame.js';
+import { panelLines } from './panel.js';
 
 /** The lines the HUD prints, wrapped to the terminal width when it is known. */
 export function renderLines(ctx: RenderContext, columns: number | null, now: number): string[] {
   const frame = createFrame(ctx, columns, now);
+  // The panel sizes every line to the terminal itself; wrapping would break the box borders.
+  if (ctx.config?.lineLayout === 'panel') return panelLines(frame).map((line) => `${RESET}${line}`);
   const lines = (ctx.config?.lineLayout ?? 'expanded') === 'expanded' ? expandedLines(frame) : compactLines(frame);
   return lines
     .flatMap((line) => line.split('\n'))

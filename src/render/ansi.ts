@@ -98,7 +98,7 @@ function stripAnsi(str: string): string {
 }
 
 // The longest prefix that fits in `width` cells, keeping the escapes before the cut.
-function sliceToWidth(str: string, width: number): string {
+export function sliceToWidth(str: string, width: number): string {
   if (width <= 0) return '';
   const ambiguousWide = isCjkLanguage();
   let result = '';

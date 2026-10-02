@@ -36,7 +36,7 @@ export function setLanguage(lang: Language): void {
 }
 
 // https://www.rfc-editor.org/info/bcp47
-function getCanonicalLanguage(): CanonicalLanguage {
+export function getCanonicalLanguage(): CanonicalLanguage {
   return CANONICAL[currentLanguage] ?? "en";
 }
 
