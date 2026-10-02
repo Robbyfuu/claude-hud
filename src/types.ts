@@ -64,7 +64,6 @@ export interface StdinData {
   // shape is kept for backwards compatibility with the original PR #471 design
   // that future-proofed a string form before Anthropic had committed a schema.
   effort?: string | { level?: string | null; [key: string]: unknown } | null;
-  version?: string;
   output_style?: { name?: string | null } | null;
   // Main-conversation prompt cache stats (Claude Code v2.1.251+).
   prompt_cache?: {
