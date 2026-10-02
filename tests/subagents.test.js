@@ -4,7 +4,9 @@ import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
 import fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { mergeConfig } from '../src/config.js';
+import { getHomeDir, getHudPluginDir } from '../src/claude-config-dir.js';
 import {
   parseSubagentTranscript,
   readAgentDefinitionSkills,
@@ -271,5 +273,52 @@ test('readSubagentDetails tolerates a truncated transcript line and an invalid m
     assert.equal(details.get('toolu_a').toolCount, 2);
     // The invalid meta leaves agent-b unmapped: toolu_b gets an empty detail, not agent-b's transcript.
     assert.equal(details.get('toolu_b').toolCount, 0);
+  });
+});
+
+const tokenCachePath = (subagentsDir) => path.join(
+  getHudPluginDir(getHomeDir()),
+  'subagent-tokens',
+  `${createHash('sha1').update(subagentsDir).digest('hex').slice(0, 16)}.json`,
+);
+
+test('readSubagentTokenTotals reuses cached tokens for unchanged subagent transcripts', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    await writeJsonl(path.join(subagentsDir, 'agent-a.jsonl'), [usageLine('msg_a1', 10, 20, 30, 40)]);
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
+    const cacheFile = tokenCachePath(subagentsDir);
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    cache.files['agent-a.jsonl'].tokens.inputTokens = 777;
+    fs.writeFileSync(cacheFile, JSON.stringify(cache));
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 777);
+  });
+});
+
+test('readSubagentTokenTotals re-parses a subagent transcript whose size changed', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    const file = path.join(subagentsDir, 'agent-a.jsonl');
+    await writeJsonl(file, [usageLine('msg_a1', 10, 20, 30, 40)]);
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
+    fs.appendFileSync(file, JSON.stringify(usageLine('msg_a2', 5, 5, 5, 5)) + '\n');
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 15);
+  });
+});
+
+test('readSubagentTokenTotals ignores a corrupt cache file', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    await writeJsonl(path.join(subagentsDir, 'agent-a.jsonl'), [usageLine('msg_a1', 10, 20, 30, 40)]);
+    const cacheFile = tokenCachePath(subagentsDir);
+    fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+    fs.writeFileSync(cacheFile, '{not json');
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
   });
 });

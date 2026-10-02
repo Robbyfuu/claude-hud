@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { HudConfig } from './config.js';
 import type { AgentEntry, SessionTokenUsage, SubagentDetail } from './types.js';
-import { getClaudeConfigDir, getHomeDir } from './claude-config-dir.js';
+import { getClaudeConfigDir, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { parseTranscript } from './transcript.js';
 import { sanitizeDisplayText } from './utils/sanitize.js';
 import { createDebug } from './debug.js';
@@ -431,9 +432,60 @@ export function readAgentDefinitionSkills(agentType: string, cwd?: string): stri
   return [];
 }
 
+interface TokenCacheEntry { size: number; mtimeMs: number; tokens: SessionTokenUsage }
+type TokenCache = Record<string, TokenCacheEntry>;
+
+const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+function isTokenCacheEntry(v: unknown): v is TokenCacheEntry {
+  if (!v || typeof v !== 'object') return false;
+  const e = v as TokenCacheEntry;
+  const t = e.tokens as Partial<SessionTokenUsage> | undefined;
+  return isCount(e.size) && isCount(e.mtimeMs) && !!t
+    && isCount(t.inputTokens) && isCount(t.outputTokens)
+    && isCount(t.cacheCreationTokens) && isCount(t.cacheReadTokens);
+}
+
+// ponytail: other sessions' cache files are never pruned (~100 bytes per subagent); prune files older than N days if the dir grows.
+function tokenCachePath(subagentsDir: string): string {
+  const key = createHash('sha1').update(subagentsDir).digest('hex').slice(0, 16);
+  return path.join(getHudPluginDir(getHomeDir()), 'subagent-tokens', `${key}.json`);
+}
+
+function readTokenCache(file: string): TokenCache {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: number; files?: Record<string, unknown> };
+    if (parsed.version !== 1 || !parsed.files || typeof parsed.files !== 'object') return {};
+    const cache: TokenCache = {};
+    for (const [name, entry] of Object.entries(parsed.files)) {
+      if (isTokenCacheEntry(entry)) cache[name] = entry;
+    }
+    return cache;
+  } catch {
+    return {};
+  }
+}
+
+function writeTokenCache(file: string, cache: TokenCache): void {
+  const tmp = `${file}.${process.pid}.tmp`;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(tmp, JSON.stringify({ version: 1, files: cache }), { mode: 0o600 });
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    debug('Failed to write token cache:', err instanceof Error ? err.message : err);
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      // Nothing left to clean up.
+    }
+  }
+}
+
 /**
- * Token usage summed across every subagent transcript of the session. Reuses
- * parseTranscript, which dedupes per message and caches each file by mtime+size.
+ * Token usage summed across every subagent transcript of the session. Finished
+ * transcripts never change, so each file's totals are cached on disk by
+ * size + mtime and parsed once.
  */
 export async function readSubagentTokenTotals(transcriptPath: string): Promise<SessionTokenUsage | null> {
   if (!transcriptPath) return null;
@@ -445,6 +497,9 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     return null;
   }
   if (files.length === 0) return null;
+  const cacheFile = tokenCachePath(dir);
+  const cached = readTokenCache(cacheFile);
+  const next: TokenCache = {};
   const total: SessionTokenUsage = {
     inputTokens: 0,
     outputTokens: 0,
@@ -452,13 +507,28 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     cacheReadTokens: 0,
   };
   for (const name of files) {
-    const tokens = (await parseTranscript(path.join(dir, name))).sessionTokens;
+    const file = path.join(dir, name);
+    let stat: fs.Stats | null = null;
+    try {
+      stat = fs.statSync(file);
+    } catch {
+      // Unstatable: parse without caching.
+    }
+    const hit = cached[name];
+    let tokens: SessionTokenUsage | undefined;
+    if (stat && hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) {
+      tokens = hit.tokens;
+    } else {
+      tokens = (await parseTranscript(file)).sessionTokens;
+    }
     if (!tokens) continue;
+    if (stat) next[name] = { size: stat.size, mtimeMs: stat.mtimeMs, tokens };
     total.inputTokens += tokens.inputTokens;
     total.outputTokens += tokens.outputTokens;
     total.cacheCreationTokens += tokens.cacheCreationTokens;
     total.cacheReadTokens += tokens.cacheReadTokens;
   }
+  if (JSON.stringify(next) !== JSON.stringify(cached)) writeTokenCache(cacheFile, next);
   return total;
 }
 
