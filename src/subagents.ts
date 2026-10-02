@@ -412,6 +412,10 @@ export function readAgentDefinitionSkills(agentType: string, cwd?: string): stri
   const pluginName = separator > 0 ? agentType.slice(0, agentType.indexOf(':')) : undefined;
   const agentName = separator > 0 ? agentType.slice(separator + 1) : agentType;
   if (!agentName || agentName === 'general-purpose') return [];
+  // The plugin name becomes a path segment: reject anything that could leave the plugin cache.
+  if (pluginName !== undefined && (path.basename(pluginName) !== pluginName || pluginName === '..' || pluginName === '.')) {
+    return [];
+  }
 
   const budget = { left: MAX_AGENT_DEF_FILES };
   for (const dir of agentDefinitionDirs(cwd, pluginName)) {

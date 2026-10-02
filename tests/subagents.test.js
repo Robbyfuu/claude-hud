@@ -368,3 +368,17 @@ test('parseSubagentTranscript skips null content blocks', async () => {
     assert.equal(detail.toolCount, 1);
   });
 });
+
+
+test('readAgentDefinitionSkills ignores a plugin name that escapes the plugin cache', async () => {
+  await withTempDir(async (dir) => {
+    // <claude>/plugins/cache/<marketplace>/<plugin>/<version>/agents; ../../../../outside from <marketplace> reaches <claude>/outside
+    await mkdir(path.join(dir, 'claude', 'plugins', 'cache', 'mkt'), { recursive: true });
+    const leak = path.join(dir, 'claude', 'plugins', 'outside', 'v1', 'agents');
+    await mkdir(leak, { recursive: true });
+    await writeFile(path.join(leak, 'secret.md'), '---\nname: secret-agent\nskills: [LEAKED]\n---\n');
+    const skills = readAgentDefinitionSkills('../../outside:secret-agent', dir);
+    assert.ok(!skills.includes('LEAKED'));
+    assert.deepEqual(readAgentDefinitionSkills('../../outside:secret-agent', dir), []);
+  });
+});
