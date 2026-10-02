@@ -32,7 +32,7 @@ All notable changes to Claude HUD will be documented in this file.
 - Show the running session's Claude Code version from stdin, falling back to `claude --version`, so `CC v…` no longer sticks when `claude` is a wrapper script (#753).
 - Keep the context cache fresh when Claude Code reports `used_percentage: 0` while `current_usage` already holds real tokens, so a later empty frame no longer restores a stale percentage (#743).
 - Show the latest response's output speed from the API time it added instead of diffing tokens against wall-clock time between renders (#772).
-- Launch the Windows + Git Bash statusline through the `cmd.exe` launcher so a statusLine shell killed mid-spawn can no longer strand a suspended `node.exe`; re-run `/claude-hud:setup` to pick it up (#748).
+- Launch the Windows + Git Bash statusline through the `cmd.exe` launcher so a statusLine shell killed mid-spawn can no longer strand a suspended `node.exe`; re-run `/claude-hud:setup` to pick it up (#748). (Not applicable to this fork: its setup rejects win32 and points to WSL.)
 - Ignore `<synthetic>` assistant records when tracking the transcript model (#774).
 - Show Claude Code's generated `ai-title` as the session name when the session was never renamed (#754).
 - Decode every C-style escape git uses in quoted porcelain paths (#765).
@@ -40,7 +40,7 @@ All notable changes to Claude HUD will be documented in this file.
 - Translate the elapsed usage-window suffix (#768).
 
 ### Security
-- Exit quietly when the setup command cannot resolve the plugin directory instead of running `dist/index.js` relative to the current project; re-run `/claude-hud:setup` to pick it up (#759).
+- Exit quietly when the setup command cannot resolve the plugin directory instead of running `dist/index.js` relative to the current project; re-run `/claude-hud:setup` to pick it up (#759). (Ported to this fork's Bun command, which would otherwise run the project's `src/index.ts`.)
 - Sanitize session names before display (#754).
 - Validate and read config files through a single file descriptor so a file swapped between the checks cannot bypass them (#732).
 
