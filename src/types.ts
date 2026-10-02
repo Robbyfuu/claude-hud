@@ -22,6 +22,7 @@ export interface StdinData {
     display_name?: string;
   };
   output_style?: { name?: string };
+  pr?: { number?: number | null; url?: string | null; review_state?: string | null } | null;
   context_window?: {
     context_window_size?: number;
     total_input_tokens?: number | null;
@@ -185,6 +186,25 @@ export interface TranscriptData {
   lastAssistantModel?: string;
 }
 
+/**
+ * Per-subagent detail read from `<session>/subagents/agent-<id>.jsonl`.
+ * Used by the `panel` layout's agent table.
+ */
+export interface SubagentDetail {
+  // Skills preloaded by the agent definition plus skills invoked via the Skill tool.
+  skills: string[];
+  // Progress of the subagent's own task list (TaskCreate/TaskUpdate or TodoWrite).
+  todosDone: number;
+  todosTotal: number;
+  // Tool currently waiting for a result, or the last tool used.
+  currentTool?: { name: string; target?: string };
+  lastTool?: { name: string; target?: string };
+  toolCount: number;
+  // Input + cache tokens of the subagent's latest request (its context size).
+  contextTokens?: number;
+  lastActivityAt?: Date;
+}
+
 export interface RenderContext {
   stdin: StdinData;
   transcript: TranscriptData;
@@ -200,4 +220,6 @@ export interface RenderContext {
   config: HudConfig;
   extraLabel: string | null;
   authInfo?: AuthInfo | null;
+  subagents?: Map<string, SubagentDetail>;
+  subagentTokens?: SessionTokenUsage | null;
 }

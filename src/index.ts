@@ -1,6 +1,7 @@
 import { getHomeDir } from "./claude-config-dir.js";
 import { getUsageFromStdin, isContextUnreported, readStdin } from "./stdin.js";
 import { parseTranscript } from "./transcript.js";
+import { readSubagentDetails, readSubagentTokenTotals, selectPanelAgents } from "./subagents.js";
 import { render } from "./render/index.js";
 import { countConfigs, type ConfigCounts } from "./config-reader.js";
 import { getGitStatus, type GitRepoIdentity, type GitStatus } from "./git.js";
@@ -26,7 +27,8 @@ export function isHudDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
 
 function needsTranscript(config: HudConfig, stdin: StdinData): boolean {
   const d = config.display;
-  return d.showTools || d.showSkills || d.showMcp || d.showAgents || d.showTodos
+  return config.lineLayout === "panel"
+    || d.showTools || d.showSkills || d.showMcp || d.showAgents || d.showTodos
     || d.showConfigCounts || d.showSessionTokens || d.showCompactions || d.showAdvisor
     || d.showSessionStartDate || d.showLastResponseAt || d.showEffortLevel
     || d.modelSource !== "stdin"
@@ -67,12 +69,17 @@ export async function main(): Promise<void> {
     const display = config.display;
     const now = Date.now();
     const extraCmd = parseExtraCmdArg();
-    const [transcript, gitStatus, extraLabel, memoryUsage] = await Promise.all([
+    const isPanel = config.lineLayout === "panel";
+    const [transcript, gitStatus, extraLabel, memoryUsage, subagentTokens] = await Promise.all([
       needsTranscript(config, stdin) ? parseTranscript(stdin.transcript_path ?? "") : EMPTY_TRANSCRIPT,
       resolveVcsStatus(config, stdin.cwd, stdin.workspace?.repo),
       extraCmd ? runExtraCmd(extraCmd) : null,
       display.showMemoryUsage && config.lineLayout === "expanded" ? getMemoryUsage() : null,
+      isPanel ? readSubagentTokenTotals(stdin.transcript_path ?? "") : null,
     ]);
+    const subagents = isPanel
+      ? readSubagentDetails(stdin.transcript_path ?? "", selectPanelAgents(transcript.agents, config, now).shown, stdin.cwd)
+      : undefined;
 
     const stdinUsage = getUsageFromStdin(stdin);
     if (display.externalUsageWritePath && stdinUsage) {
@@ -94,6 +101,8 @@ export async function main(): Promise<void> {
       config,
       extraLabel,
       authInfo: display.showAuth || display.showAuthUser ? readAuthInfo() : null,
+      subagents,
+      subagentTokens,
     });
   } catch (error) {
     console.log("[claude-hud] Error:", error instanceof Error ? error.message : "Unknown error");

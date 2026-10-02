@@ -9,6 +9,7 @@ import { formatResetTime } from './format-reset-time.js';
 import { formatAgentModel } from './agents-line.js';
 import { codePointCellWidth, isCjkAmbiguousWide } from './width.js';
 import { RESET } from './colors.js';
+import { selectPanelAgents } from '../subagents.js';
 
 // "panel" layout: boxed session / usage / environment panes over an activity
 // pane with a per-agent table. Every line is sized to the terminal width
@@ -51,7 +52,6 @@ const MAX_PANEL_WIDTH = 180;
 const EDGE_MARGIN = 4;
 const WIDE_MIN = 112;
 const MEDIUM_MIN = 76;
-const MAX_COMPLETED_SHOWN = 2;
 // A cold prompt cache rewrites the whole context; worth a new session past this size.
 const COLD_CACHE_REWRITE_MIN_TOKENS = 200_000;
 
@@ -477,29 +477,6 @@ function environmentInline(ctx: RenderContext): Line {
 
 // ---------------------------------------------------------------------------
 // Agents
-
-export function selectPanelAgents(
-  agents: AgentEntry[],
-  config: Pick<HudConfig, 'panel'> | undefined,
-  now: number,
-): { shown: AgentEntry[]; hiddenRunning: number } {
-  const maxAgents = config?.panel?.maxAgents ?? 5;
-  const retentionMs = (config?.panel?.completedRetentionSeconds ?? 120) * 1000;
-
-  const running = agents.filter((agent) => agent.status === 'running');
-  const runningShown = running.slice(-maxAgents);
-  const completedSlots = Math.min(MAX_COMPLETED_SHOWN, maxAgents - runningShown.length);
-  const completed = completedSlots > 0
-    ? agents
-      .filter((agent) => {
-        const end = agent.endTime?.getTime();
-        return agent.status === 'completed' && end !== undefined && now - end <= retentionMs;
-      })
-      .slice(-completedSlots)
-    : [];
-
-  return { shown: [...runningShown, ...completed], hiddenRunning: running.length - runningShown.length };
-}
 
 /** Fits as many skills as possible, then "+N" for the rest. */
 function fitSkills(skills: string[], width: number, color: string): Line {

@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { HudConfig } from './config.js';
 import type { AgentEntry, SessionTokenUsage, SubagentDetail } from './types.js';
 import { getClaudeConfigDir, getHomeDir } from './claude-config-dir.js';
 import { parseTranscript } from './transcript.js';
@@ -20,6 +21,7 @@ const MAX_NAME_LEN = 48;
 const MAX_TARGET_LEN = 80;
 const MAX_SKILLS = 8;
 const MAX_AGENT_DEF_FILES = 400;
+const MAX_COMPLETED_SHOWN = 2;
 
 // Bookkeeping tools that say nothing about what the agent is doing.
 const QUIET_TOOLS = new Set([
@@ -448,7 +450,6 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     outputTokens: 0,
     cacheCreationTokens: 0,
     cacheReadTokens: 0,
-    cacheCreationOneHourTokens: 0,
   };
   for (const name of files) {
     const tokens = (await parseTranscript(path.join(dir, name))).sessionTokens;
@@ -457,7 +458,6 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     total.outputTokens += tokens.outputTokens;
     total.cacheCreationTokens += tokens.cacheCreationTokens;
     total.cacheReadTokens += tokens.cacheReadTokens;
-    total.cacheCreationOneHourTokens += tokens.cacheCreationOneHourTokens;
   }
   return total;
 }
@@ -490,4 +490,27 @@ export function readSubagentDetails(
     details.set(agent.id, detail);
   }
   return details;
+}
+
+export function selectPanelAgents(
+  agents: AgentEntry[],
+  config: Pick<HudConfig, 'panel'> | undefined,
+  now: number,
+): { shown: AgentEntry[]; hiddenRunning: number } {
+  const maxAgents = config?.panel?.maxAgents ?? 5;
+  const retentionMs = (config?.panel?.completedRetentionSeconds ?? 120) * 1000;
+
+  const running = agents.filter((agent) => agent.status === 'running');
+  const runningShown = running.slice(-maxAgents);
+  const completedSlots = Math.min(MAX_COMPLETED_SHOWN, maxAgents - runningShown.length);
+  const completed = completedSlots > 0
+    ? agents
+      .filter((agent) => {
+        const end = agent.endTime?.getTime();
+        return agent.status === 'completed' && end !== undefined && now - end <= retentionMs;
+      })
+      .slice(-completedSlots)
+    : [];
+
+  return { shown: [...runningShown, ...completed], hiddenRunning: running.length - runningShown.length };
 }
