@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderUsageLine } from '../dist/render/lines/usage.js';
-import { renderSessionLine } from '../dist/render/session-line.js';
+import { renderUsageLine } from '../src/render/lines/usage.js';
+import { renderSessionLine } from '../src/render/session-line.js';
 
 // display.usagePace: colour usage windows by projected usage at reset and mark
 // amber/red pace with ▲. Covered through both renderers: renderUsageLine

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderCacheHitRateLine } from '../dist/render/lines/cache-hit-rate.js';
-import { setLanguage } from '../dist/i18n/index.js';
+import { renderCacheHitRateLine } from '../src/render/lines/cache-hit-rate.js';
+import { setLanguage } from '../src/i18n/index.js';
 
 function stripAnsi(str) {
   // eslint-disable-next-line no-control-regex
