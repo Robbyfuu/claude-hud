@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseTranscript } from '../src/transcript.js';
@@ -19,6 +19,36 @@ async function parse(entries) {
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+async function withTempDir(fn) {
+  const dir = await mkdtemp(path.join(tmpdir(), 'hud-panel-'));
+  const prev = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = path.join(dir, 'claude');
+  try {
+    return await fn(dir);
+  } finally {
+    if (prev === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = prev;
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function writeJsonl(file, entries) {
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, entries.map((e) => JSON.stringify(e)).join('\n') + '\n');
+}
+
+const toolUse = (id, name, input, extra = {}) => ({
+  type: 'assistant',
+  timestamp: '2026-01-01T00:00:00.000Z',
+  message: { content: [{ type: 'tool_use', id, name, input }], ...extra },
+});
+const toolResult = (id, toolUseResult) => ({
+  type: 'user',
+  timestamp: '2026-01-01T00:00:01.000Z',
+  message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+  ...(toolUseResult ? { toolUseResult } : {}),
+});
 
 const launch = (id, ts, input) => ({
   timestamp: ts,
@@ -76,4 +106,24 @@ test('an idle notification before the launch does not complete a relaunch with t
     launch('a-1', '2024-01-01T00:01:00.000Z', { name: 'mapper' }),
   ]);
   assert.equal(result.agents[0].status, 'running');
+});
+
+test('parseTranscript counts every tool use and maps task ids Claude Code assigns', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'main.jsonl');
+    const entries = [];
+    for (let i = 0; i < 25; i++) {
+      entries.push(toolUse(`b${i}`, 'Bash', { command: 'ls' }), toolResult(`b${i}`));
+    }
+    // A subagent already used ids 1-7 of the shared task list.
+    entries.push(toolUse('c1', 'TaskCreate', { subject: 'first', description: 'x' }), toolResult('c1', { task: { id: '8' } }));
+    entries.push(toolUse('c2', 'TaskCreate', { subject: 'second', description: 'x' }), toolResult('c2', { task: { id: '9' } }));
+    entries.push(toolUse('u1', 'TaskUpdate', { taskId: '9', status: 'completed' }), toolResult('u1'));
+    await writeJsonl(file, entries);
+
+    const result = await parseTranscript(file);
+    assert.equal(result.toolCounts.Bash, 25);
+    assert.equal(result.tools.length, 20);
+    assert.deepEqual(result.todos.map((todo) => todo.status), ['pending', 'completed']);
+  });
 });

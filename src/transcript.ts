@@ -43,9 +43,9 @@ interface Entry {
   isSidechain?: boolean;
   advisorModel?: unknown;
   message?: { id?: unknown; model?: unknown; content?: Block[] | string; usage?: Usage };
-  toolUseResult?: { resolvedModel?: unknown; isAsync?: unknown; status?: unknown };
+  toolUseResult?: { resolvedModel?: unknown; isAsync?: unknown; status?: unknown; task?: { id?: unknown } };
   compactMetadata?: { postTokens?: unknown };
-  attachment?: { type?: string };
+  attachment?: { type?: string; hookName?: string };
 }
 
 const emptyTranscript = (): TranscriptData => ({ tools: [], skills: [], mcpServers: [], mcpErrors: [], agents: [], todos: [] });
@@ -127,6 +127,10 @@ class Parser {
   private todos: TodoItem[] = [];
   private taskIndex = new Map<string, number>();
   private agentCompletions = new Map<string, Date>();
+  // Background agents die with their Claude Code process; teammates report it as an idle notification.
+  private lastProcessStart: Date | undefined;
+  private teammateIdle: { name: string; at: Date }[] = [];
+  private toolCounts: Record<string, number> = {};
   // Claude Code logs one API response several times, sometimes non-adjacently, so usage
   // is the per-field max per message id. Ids evicted to bound memory settle into `settled`.
   private usageById = new Map<string, SessionTokenUsage>();
@@ -155,6 +159,16 @@ class Parser {
     } else {
       this.lastIdlessUsage = undefined;
     }
+    if (at && entry.type === 'attachment') {
+      // compact/clear fire SessionStart inside the same process, so only these two mean a restart.
+      const hook = entry.attachment?.hookName;
+      if (hook === 'SessionStart:startup' || hook === 'SessionStart:resume') this.lastProcessStart = at;
+    }
+    if (at && entry.type === 'user' && typeof entry.message?.content === 'string') {
+      for (const m of entry.message.content.matchAll(/<teammate-message teammate_id="([^"]+)"[^>]*>([\s\S]*?)<\/teammate-message>/g)) {
+        if (m[2].includes('"idle_notification"')) this.teammateIdle.push({ name: m[1], at });
+      }
+    }
     if (entry.type === 'user' && typeof entry.message?.content === 'string') {
       const effort = EFFORT_COMMAND.exec(entry.message.content);
       if (effort) this.data.ultracodeActive = effort[1].toLowerCase() === 'ultracode';
@@ -176,7 +190,7 @@ class Parser {
 
     if (Array.isArray(entry.message?.content)) {
       for (const block of entry.message.content) {
-        if (block?.type === 'tool_use' && block.id && block.name) this.toolUse(block, at ?? new Date());
+        if (block?.type === 'tool_use' && block.id && block.name) this.toolUse(block, at ?? new Date(), entry.isSidechain === true);
         if (block?.type === 'tool_result' && block.tool_use_id) this.toolResult(block, entry, at ?? new Date());
       }
     }
@@ -224,8 +238,12 @@ class Parser {
     this.lastIdlessUsage = fingerprint;
   }
 
-  private toolUse(block: Block, at: Date): void {
+  private toolUse(block: Block, at: Date, sidechain: boolean): void {
     const toolName = block.name as string;
+    if (!sidechain) {
+      const key = name(toolName) ?? toolName.slice(0, NAME_MAX_LEN);
+      this.toolCounts[key] = (this.toolCounts[key] ?? 0) + 1;
+    }
     const input = block.input;
     const skill = toolName === 'Skill' ? name(input?.skill) : undefined;
     if (skill) this.skills.add(skill);
@@ -236,6 +254,7 @@ class Parser {
       this.agents.set(block.id as string, {
         id: block.id as string,
         type: (input?.subagent_type as string) ?? 'agent',
+        name: name(input?.name),
         model: sanitizeTranscriptModel(input?.model),
         description: (input?.description as string) ?? undefined,
         status: 'running',
@@ -269,6 +288,11 @@ class Parser {
 
   private toolResult(block: Block, entry: Entry, at: Date): void {
     const id = block.tool_use_id as string;
+    const createdIndex = this.taskIndex.get(id);
+    const assignedId = entry.toolUseResult?.task?.id;
+    if (createdIndex !== undefined && (typeof assignedId === 'string' || typeof assignedId === 'number')) {
+      this.taskIndex.set(String(assignedId), createdIndex);
+    }
     const tool = this.tools.get(id);
     if (tool) {
       tool.status = block.is_error ? 'error' : 'completed';
@@ -325,6 +349,20 @@ class Parser {
       const agent = this.agents.get(id);
       if (agent?.background) agent.endTime = endTime;
     }
+    // ponytail: a teammate woken again by SendMessage after going idle shows as completed until
+    // its next idle; tracking wake-ups needs the SendMessage calls.
+    const running = (agent: AgentEntry) => agent.background && agent.status === 'running' && !agent.endTime;
+    for (const { name, at } of this.teammateIdle) {
+      for (const agent of this.agents.values()) {
+        if (running(agent) && agent.name === name && agent.startTime <= at) agent.endTime = at;
+      }
+    }
+    const restart = this.lastProcessStart;
+    if (restart) {
+      for (const agent of this.agents.values()) {
+        if (running(agent) && agent.startTime < restart) agent.endTime = restart;
+      }
+    }
     for (const agent of this.agents.values()) {
       if (agent.endTime) agent.status = 'completed';
     }
@@ -338,6 +376,7 @@ class Parser {
       mcpServers: [...this.mcpServers],
       mcpErrors: [...this.mcpErrors],
       todos: this.todos,
+      toolCounts: this.toolCounts,
       sessionTokens,
     };
   }

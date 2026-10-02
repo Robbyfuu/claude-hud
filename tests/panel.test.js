@@ -536,26 +536,6 @@ test('readSubagentTokenTotals ignores an empty transcript path instead of readin
   });
 });
 
-test('parseTranscript counts every tool use and maps task ids Claude Code assigns', async () => {
-  await withTempDir(async (dir) => {
-    const file = path.join(dir, 'main.jsonl');
-    const entries = [];
-    for (let i = 0; i < 25; i++) {
-      entries.push(toolUse(`b${i}`, 'Bash', { command: 'ls' }), toolResult(`b${i}`));
-    }
-    // A subagent already used ids 1-7 of the shared task list.
-    entries.push(toolUse('c1', 'TaskCreate', { subject: 'first', description: 'x' }), toolResult('c1', { task: { id: '8' } }));
-    entries.push(toolUse('c2', 'TaskCreate', { subject: 'second', description: 'x' }), toolResult('c2', { task: { id: '9' } }));
-    entries.push(toolUse('u1', 'TaskUpdate', { taskId: '9', status: 'completed' }), toolResult('u1'));
-    await writeJsonl(file, entries);
-
-    const result = await parseTranscript(file);
-    assert.equal(result.toolCounts.Bash, 25);
-    assert.equal(result.tools.length, 20);
-    assert.deepEqual(result.todos.map((todo) => todo.status), ['pending', 'completed']);
-  });
-});
-
 test('the Spanish locale covers every English message key', () => {
   assert.deepEqual(Object.keys(es).sort(), Object.keys(en).sort());
   setLanguage('es');

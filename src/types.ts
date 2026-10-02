@@ -77,6 +77,7 @@ export interface AgentEntry {
   type: string;
   model?: string;
   description?: string;
+  name?: string;
   status: 'running' | 'completed';
   startTime: Date;
   endTime?: Date;
@@ -155,6 +156,8 @@ export interface TranscriptData {
   mcpErrors: string[];
   agents: AgentEntry[];
   todos: TodoItem[];
+  // Session-wide tool_use counts by name, main chain only.
+  toolCounts?: Record<string, number>;
   sessionStart?: Date;
   // Last assistant response of any kind, subagents included. Drives the
   // last-response element.
