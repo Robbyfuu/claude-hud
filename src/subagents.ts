@@ -246,6 +246,7 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
     if (!Array.isArray(content)) continue;
 
     for (const block of content) {
+      if (!block || typeof block !== 'object') continue;
       if (block.type === 'tool_use' && block.id && block.name) {
         const input = block.input ?? {};
 
@@ -406,6 +407,7 @@ function agentDefinitionDirs(cwd: string | undefined, pluginName: string | undef
 
 /** Skills preloaded by an agent definition's `skills:` frontmatter. */
 export function readAgentDefinitionSkills(agentType: string, cwd?: string): string[] {
+  if (typeof agentType !== 'string') return [];
   const separator = agentType.lastIndexOf(':');
   const pluginName = separator > 0 ? agentType.slice(0, agentType.indexOf(':')) : undefined;
   const agentName = separator > 0 ? agentType.slice(separator + 1) : agentType;
@@ -554,10 +556,12 @@ export function readSubagentDetails(
     const parsed = file ? parseSubagentTranscript(file) : null;
     const detail: SubagentDetail = parsed ?? { skills: [], todosDone: 0, todosTotal: 0, toolCount: 0 };
 
-    if (!definitionSkills.has(agent.type)) {
-      definitionSkills.set(agent.type, readAgentDefinitionSkills(agent.type, cwd));
+    // The type comes from an untrusted transcript cast; tolerate non-strings.
+    const agentType = typeof agent.type === 'string' ? agent.type : 'agent';
+    if (!definitionSkills.has(agentType)) {
+      definitionSkills.set(agentType, readAgentDefinitionSkills(agentType, cwd));
     }
-    const preloaded = definitionSkills.get(agent.type) ?? [];
+    const preloaded = definitionSkills.get(agentType) ?? [];
     detail.skills = Array.from(new Set([...preloaded, ...detail.skills])).slice(0, MAX_SKILLS);
     details.set(agent.id, detail);
   }

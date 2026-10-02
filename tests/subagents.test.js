@@ -344,3 +344,27 @@ test('readSubagentTokenTotals ignores cache entries smuggled through a __proto__
     assert.doesNotMatch(fs.readFileSync(cacheFile, 'utf8'), /__proto__/);
   });
 });
+
+test('readSubagentDetails tolerates a non-string agent type', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const details = readSubagentDetails(transcriptPath, [
+      { id: 'toolu_a', type: 5, status: 'running', startTime: new Date() },
+    ], dir);
+    assert.ok(details.get('toolu_a'));
+  });
+});
+
+test('parseSubagentTranscript skips null content blocks', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'agent-x.jsonl');
+    await writeJsonl(file, [{
+      type: 'assistant',
+      timestamp: '2026-01-01T00:00:00.000Z',
+      message: { content: [null, 'text', { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: '/p/a.ts' } }] },
+    }]);
+    const detail = parseSubagentTranscript(file);
+    assert.equal(detail.toolCount, 1);
+  });
+});
