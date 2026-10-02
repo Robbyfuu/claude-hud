@@ -90,7 +90,7 @@ export async function main(): Promise<void> {
     render({
       stdin,
       transcript,
-      ...(display.showConfigCounts ? countConfigs(stdin.cwd) : NO_COUNTS),
+      ...(display.showConfigCounts || isPanel ? countConfigs(stdin.cwd) : NO_COUNTS),
       costTotals: display.showDailyCost || display.showWeeklyCost
         ? getCostTotals(stdin, { allowRoutedCost: display.showRoutedCost, sevenDayResetAt: usageData?.sevenDayResetAt ?? null })
         : null,

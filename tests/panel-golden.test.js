@@ -55,7 +55,7 @@ async function runCase(spec) {
       await copyDir(path.join(goldenDir, 'subagents'), path.join(projectDir, 'golden-session', 'subagents'));
       await copyDir(path.join(goldenDir, 'agents'), path.join(configDir, 'agents'), (n) => n.endsWith('.md'));
     }
-    if (spec.setup) await spec.setup({ projectDir, transcript });
+    if (spec.setup) await spec.setup({ projectDir, transcript, configDir, project });
     const pluginDir = path.join(configDir, 'plugins', 'claude-hud');
     await mkdir(pluginDir, { recursive: true });
     if (spec.config) {
@@ -208,4 +208,35 @@ test("main adds subagent token totals to the panel's session token total", async
   const session = plain.split('\n').find((line) => line.includes(' tok'));
   assert.ok(session, `a token segment in:\n${plain}`);
   assert.match(session, /· 42k tok \(36% cache\)/);
+});
+
+test('panel counts CLAUDE.md, rules, MCP servers and hooks without display.showConfigCounts', async () => {
+  const { raw } = await runCase({
+    name: 'config-counts',
+    stdin: {
+      session_id: 'golden-session',
+      transcript_path: '<TRANSCRIPT>',
+      cwd: '<PROJECT>',
+      model: { id: 'claude-opus-5-5', display_name: 'Opus 5.5' },
+      context_window: { context_window_size: 200_000, used_percentage: 10, current_usage: { input_tokens: 20_000 } },
+    },
+    config: { lineLayout: 'panel' },
+    columns: 140,
+    transcript: null,
+    async setup({ configDir, project }) {
+      await writeFile(path.join(configDir, 'CLAUDE.md'), '# user\n');
+      await mkdir(path.join(configDir, 'rules'), { recursive: true });
+      await writeFile(path.join(configDir, 'rules', 'style.md'), '# rule\n');
+      await writeFile(path.join(configDir, 'settings.json'), JSON.stringify({
+        hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'true' }] }] },
+      }));
+      await writeFile(path.join(project, '.mcp.json'), JSON.stringify({
+        mcpServers: { docs: { command: 'docs-server' } },
+      }));
+    },
+  });
+  // eslint-disable-next-line no-control-regex
+  const plain = raw.replace(/\x1b\[[0-9;]*m/g, '');
+  assert.match(plain, /CLAUDE\.md +1  rules +1 /);
+  assert.match(plain, /MCP +1  hooks +1 /);
 });
