@@ -166,6 +166,9 @@ Labels are available in English (the default), Spanish (`es`), Simplified Chines
 | `display.showCacheHitRate` | boolean | false | Show the session's prompt-cache hit rate as `Cache hit X%` |
 | `display.customLine` | string | `""` | Custom text shown on the first line (80 characters max) |
 | `display.customLinePosition` | `first` \| `last` | `last` | Put the custom text at the start or the end of the first line |
+| `panel.icons` | `none` \| `nerd` | `none` | Panel layout icons. `nerd` uses Nerd Font glyphs (model, folder, branch, clock, reset); needs a Nerd Font in the terminal |
+| `panel.maxAgents` | number | 5 | Max agent rows in the panel's activity box (1-20). Running agents always come first |
+| `panel.completedRetentionSeconds` | number | 120 | How long a finished agent stays in the panel's agent table (0-86400) |
 | `colors.context` | color value | `green` | Base color for the context bar and context percentage |
 | `colors.usage` | color value | `brightBlue` | Base color for usage bars and percentages below warning thresholds |
 | `colors.warning` | color value | `yellow` | Warning color for context thresholds and usage warning text |

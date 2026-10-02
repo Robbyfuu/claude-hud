@@ -11,8 +11,9 @@ const MAX_CONFIG_FILE_BYTES = 64 * 1024;
 const MAX_CONFIG_NESTING_DEPTH = 8;
 const UNSAFE_CONFIG_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
-const LANGUAGES = ['en', 'zh', 'zh-Hans', 'zh-Hant', 'zh-TW'] as const satisfies readonly Language[];
-const LINE_LAYOUTS = ['compact', 'expanded'] as const;
+const LANGUAGES = ['en', 'es', 'zh', 'zh-Hans', 'zh-Hant', 'zh-TW'] as const satisfies readonly Language[];
+const LINE_LAYOUTS = ['compact', 'expanded', 'panel'] as const;
+const PANEL_ICONS = ['nerd', 'none'] as const;
 const PATH_LEVELS = [1, 2, 3, 'full'] as const;
 const CONTEXT_VALUE_MODES = ['percent', 'tokens', 'remaining', 'both'] as const;
 const USAGE_VALUE_MODES = ['percent', 'remaining'] as const;
@@ -194,6 +195,11 @@ export interface HudConfig {
     advisorOverride: string;
     autoCompactWindow: number | null;
   };
+  panel: {
+    icons: typeof PANEL_ICONS[number];
+    maxAgents: number;
+    completedRetentionSeconds: number;
+  };
   colors: HudColorOverrides;
 }
 
@@ -290,6 +296,11 @@ export const DEFAULT_CONFIG: HudConfig = {
     advisorOverride: '',
     autoCompactWindow: null,
   },
+  panel: {
+    icons: 'none',
+    maxAgents: 5,
+    completedRetentionSeconds: 120,
+  },
   colors: {
     context: 'green',
     usage: 'brightBlue',
@@ -327,6 +338,9 @@ const oneOf = (allowed: readonly unknown[]): Rule => (value, fallback) => (
 );
 const clamp = (min: number, max: number): Rule => (value, fallback) => (
   isNumber(value) ? Math.max(min, Math.min(max, value)) : fallback
+);
+const floorClamp = (min: number, max: number): Rule => (value, fallback) => (
+  isNumber(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback
 );
 const floorAtLeastZero: Rule = (value, fallback) => (isNumber(value) ? Math.max(0, Math.floor(value)) : fallback);
 const count: Rule = (value, fallback) => (Number.isInteger(value) && (value as number) >= 0 ? value : fallback);
@@ -387,6 +401,9 @@ const RULES: Record<string, Rule> = {
   'language': oneOf(LANGUAGES),
   'lineLayout': oneOf(LINE_LAYOUTS),
   'pathLevels': oneOf(PATH_LEVELS),
+  'panel.icons': oneOf(PANEL_ICONS),
+  'panel.maxAgents': floorClamp(1, 20),
+  'panel.completedRetentionSeconds': floorClamp(0, 86400),
   'maxWidth': (value) => (isNumber(value) && value > 0 ? Math.min(Math.floor(value), MAX_TERMINAL_WIDTH) : null),
   'elementOrder': names(ELEMENTS, true),
   'projectLineOrder': names(FIRST_LINE_SEGMENTS, false),

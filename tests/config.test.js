@@ -88,8 +88,8 @@ test('boolean options accept only booleans', () => {
 
 test('enum options accept only their listed values', () => {
   const enums = {
-    language: ['en', 'zh', 'zh-Hans', 'zh-Hant', 'zh-TW'],
-    lineLayout: ['compact', 'expanded'],
+    language: ['en', 'es', 'zh', 'zh-Hans', 'zh-Hant', 'zh-TW'],
+    lineLayout: ['compact', 'expanded', 'panel'],
     pathLevels: [1, 2, 3, 'full'],
     'gitStatus.branchOverflow': ['truncate', 'wrap'],
     'display.addedDirsLayout': ['inline', 'line'],

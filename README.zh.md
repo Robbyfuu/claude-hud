@@ -166,6 +166,9 @@ Claude HUD 是一个[状态栏](https://code.claude.com/docs/en/statusline)命�
 | `display.showCacheHitRate` | boolean | false | 以 `Cache hit X%` 形式显示本会话的 prompt cache 命中率 |
 | `display.customLine` | string | `""` | 显示在第一行的自定义文字（最多 80 个字符） |
 | `display.customLinePosition` | `first` \| `last` | `last` | 自定义文字放在第一行的开头还是结尾 |
+| `panel.icons` | `none` \| `nerd` | `none` | 面板布局的图标。`nerd` 使用 Nerd Font 字形（模型、文件夹、分支、时钟、重置），终端需安装 Nerd Font |
+| `panel.maxAgents` | 数字 | 5 | 面板活动框中显示的最大代理行数（1-20）。运行中的代理始终排在前面 |
+| `panel.completedRetentionSeconds` | 数字 | 120 | 已完成的代理在面板代理表中保留的时长，单位秒（0-86400） |
 | `colors.context` | 颜色值 | `green` | 上下文进度条和百分比的基础颜色 |
 | `colors.usage` | 颜色值 | `brightBlue` | 使用率进度条和低于警告阈值时百分比的颜色 |
 | `colors.warning` | 颜色值 | `yellow` | 上下文阈值和使用率警告文本的警告颜色 |

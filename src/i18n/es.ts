@@ -10,7 +10,6 @@ export const es: Messages = {
   "label.cacheHitRate": "Aciertos de caché",
   "label.rules": "reglas",
   "label.hooks": "hooks",
-  "label.estimatedCost": "Est.",
   "label.cost": "Costo",
   "label.today": "Hoy",
   "label.week": "Semana",
