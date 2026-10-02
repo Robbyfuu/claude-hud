@@ -443,7 +443,13 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     return null;
   }
   if (files.length === 0) return null;
-  const total: SessionTokenUsage = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+  const total: SessionTokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationOneHourTokens: 0,
+  };
   for (const name of files) {
     const tokens = (await parseTranscript(path.join(dir, name))).sessionTokens;
     if (!tokens) continue;
@@ -451,6 +457,7 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     total.outputTokens += tokens.outputTokens;
     total.cacheCreationTokens += tokens.cacheCreationTokens;
     total.cacheReadTokens += tokens.cacheReadTokens;
+    total.cacheCreationOneHourTokens += tokens.cacheCreationOneHourTokens;
   }
   return total;
 }

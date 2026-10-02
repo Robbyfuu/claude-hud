@@ -474,12 +474,18 @@ test('readSubagentDetails maps background teammates through meta.json name', asy
   });
 });
 
-const usageLine = (id, input, output, cacheCreation, cacheRead) => ({
+const usageLine = (id, input, output, cacheCreation, cacheRead, cacheCreationOneHour = 0) => ({
   type: 'assistant',
   message: {
     id,
     content: [],
-    usage: { input_tokens: input, output_tokens: output, cache_creation_input_tokens: cacheCreation, cache_read_input_tokens: cacheRead },
+    usage: {
+      input_tokens: input,
+      output_tokens: output,
+      cache_creation_input_tokens: cacheCreation,
+      cache_read_input_tokens: cacheRead,
+      cache_creation: { ephemeral_1h_input_tokens: cacheCreationOneHour },
+    },
   },
 });
 
@@ -493,13 +499,14 @@ test('readSubagentTokenTotals sums token usage across subagent transcripts', asy
       usageLine('msg_a1', 10, 20, 30, 40), // dual-logged duplicate
       usageLine('msg_a2', 1, 2, 3, 4),
     ]);
-    await writeJsonl(path.join(subagentsDir, 'agent-b.jsonl'), [usageLine('msg_b1', 100, 200, 300, 400)]);
+    await writeJsonl(path.join(subagentsDir, 'agent-b.jsonl'), [usageLine('msg_b1', 100, 200, 300, 400, 250)]);
     await mkdir(path.join(subagentsDir, 'agent-broken.jsonl'));
     assert.deepEqual(await readSubagentTokenTotals(transcriptPath), {
       inputTokens: 111,
       outputTokens: 222,
       cacheCreationTokens: 333,
       cacheReadTokens: 444,
+      cacheCreationOneHourTokens: 250,
     });
   });
 });
