@@ -22,6 +22,7 @@ Ask these with AskUserQuestion, in two batches of up to four. Put the current va
 - "Expanded": `lineLayout: "expanded"`, `showSeparators: false`
 - "Compact": `lineLayout: "compact"`, `showSeparators: false`
 - "Compact + separators": `lineLayout: "compact"`, `showSeparators: true`
+- "Panel": `lineLayout: "panel"`, `showSeparators: false`
 
 **Activity lines** (multi-select)
 - "Tools": `display.showTools`
@@ -52,6 +53,7 @@ Ask these with AskUserQuestion, in two batches of up to four. Put the current va
 - "English": `language: "en"`
 - "简体中文": `language: "zh-Hans"`
 - "繁體中文": `language: "zh-Hant"`
+- "Español": `language: "es"`
 
 **Custom line** (single select)
 - "Keep current"
