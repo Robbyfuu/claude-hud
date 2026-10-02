@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { promptCacheLine } from '../dist/render/lines.js';
-import { setLanguage } from '../dist/i18n/index.js';
+import { promptCacheLine } from '../src/render/lines.js';
+import { setLanguage } from '../src/i18n/index.js';
 
 const NOW = Date.UTC(2026, 9, 1, 12, 0, 0);
 const strip = (s) => s?.replace(/\x1b\[[0-9;]*m/g, '');

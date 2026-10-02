@@ -4,7 +4,7 @@ import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { getGitStatus, parseNumstat, parseStatus } from '../dist/git.js';
+import { getGitStatus, parseNumstat, parseStatus } from '../src/git.js';
 
 const IDENTITY = ['-c', 'user.name=Test', '-c', 'user.email=test@test.com', '-c', 'commit.gpgsign=false'];
 

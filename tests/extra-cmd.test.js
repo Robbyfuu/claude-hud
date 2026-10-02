@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseExtraCmdArg, runExtraCmd, isExtraCmdAllowed } from '../dist/extra-cmd.js';
+import { parseExtraCmdArg, runExtraCmd, isExtraCmdAllowed } from '../src/extra-cmd.js';
 
 const ALLOWED = { CLAUDE_HUD_ALLOW_EXTRA_CMD: '1' };
 const argv = (...args) => ['node', 'index.js', ...args];

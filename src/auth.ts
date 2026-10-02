@@ -1,6 +1,5 @@
 import * as fs from 'node:fs';
-import * as os from 'node:os';
-import { getClaudeConfigJsonPath } from './claude-config-dir.js';
+import { getClaudeConfigJsonPath, getHomeDir } from './claude-config-dir.js';
 import { sanitizeDisplayText } from './utils/sanitize.js';
 
 /**
@@ -111,7 +110,7 @@ export function readAuthInfo(): AuthInfo {
     return API_KEY_AUTH_INFO;
   }
   try {
-    return deriveAuthInfo(JSON.parse(fs.readFileSync(getClaudeConfigJsonPath(os.homedir()), 'utf8')));
+    return deriveAuthInfo(JSON.parse(fs.readFileSync(getClaudeConfigJsonPath(getHomeDir()), 'utf8')));
   } catch {
     return EMPTY_AUTH_INFO;
   }

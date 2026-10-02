@@ -14,7 +14,7 @@ import cases, { NOW_MS } from './panel-golden/cases.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const goldenDir = path.join(root, 'tests', 'panel-golden');
 const expectedPath = path.join(goldenDir, 'expected.txt');
-const freezeTime = path.join(goldenDir, 'freeze-time.mjs');
+const freezeTime = path.join(root, 'tests', 'golden', 'freeze-time.mjs');
 const update = process.env.UPDATE_SNAPSHOTS === '1';
 
 async function setUpGit(cwd, env, state) {

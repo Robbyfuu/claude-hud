@@ -1,8 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { createDebug } from './debug.js';
-import { getClaudeConfigDir, getClaudeConfigJsonPath } from './claude-config-dir.js';
+import { getClaudeConfigDir, getClaudeConfigJsonPath, getHomeDir } from './claude-config-dir.js';
 
 const debug = createDebug('config-reader');
 
@@ -84,7 +83,7 @@ function sameLocation(a: string, b: string): boolean {
 }
 
 export function countConfigs(cwd?: string): ConfigCounts {
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   const claudeDir = getClaudeConfigDir(homeDir);
   const exists = (...parts: string[]): boolean => fs.existsSync(path.join(...parts));
 

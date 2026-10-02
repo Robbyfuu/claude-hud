@@ -1,9 +1,9 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { isCjkLanguage, setLanguage, t } from '../dist/i18n/index.js';
-import { en } from '../dist/i18n/en.js';
-import { zhHans } from '../dist/i18n/zh-Hans.js';
-import { zhHant } from '../dist/i18n/zh-Hant.js';
+import { isCjkLanguage, setLanguage, t } from '../src/i18n/index.js';
+import { en } from '../src/i18n/en.js';
+import { zhHans } from '../src/i18n/zh-Hans.js';
+import { zhHant } from '../src/i18n/zh-Hant.js';
 
 afterEach(() => setLanguage('en'));
 

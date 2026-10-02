@@ -4,8 +4,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseTranscript } from '../dist/transcript.js';
-import { TRANSCRIPT_MODEL_MAX_LEN } from '../dist/model-source.js';
+import { parseTranscript } from '../src/transcript.js';
+import { TRANSCRIPT_MODEL_MAX_LEN } from '../src/model-source.js';
 
 const fixture = (name) => fileURLToPath(new URL(name, import.meta.url));
 

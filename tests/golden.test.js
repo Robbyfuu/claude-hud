@@ -1,6 +1,6 @@
-// End-to-end golden output: runs dist/index.js for every case in
+// End-to-end golden output: runs src/index.ts for every case in
 // tests/golden/cases.mjs and compares stdout with tests/golden/expected.txt.
-// Regenerate with `npm run test:update-snapshots`.
+// Regenerate with `UPDATE_SNAPSHOTS=1 bun test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
@@ -13,7 +13,7 @@ import cases, { NOW_MS } from './golden/cases.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const goldenDir = path.join(root, 'tests', 'golden');
 const expectedPath = path.join(goldenDir, 'expected.txt');
-const freezeTime = pathToFileURL(path.join(goldenDir, 'freeze-time.mjs')).href;
+const freezeTime = path.join(goldenDir, 'freeze-time.mjs');
 const update = process.env.UPDATE_SNAPSHOTS === '1';
 
 async function setUpGit(cwd, env, state) {
@@ -76,7 +76,7 @@ async function runCase(spec) {
       .replaceAll('<TRANSCRIPT>', transcript);
 
     const stdout = await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, ['--import', freezeTime, path.join(root, 'dist', 'index.js')], {
+      const child = spawn(process.execPath, ['--preload', freezeTime, path.join(root, 'src', 'index.ts')], {
         cwd: project,
         env,
       });
@@ -130,7 +130,7 @@ test('golden output', { skip: process.platform === 'win32' }, async (t) => {
   }
 
   const expected = parseExpected(await readFile(expectedPath, 'utf8').catch(() => ''));
-  assert.deepEqual([...expected.keys()], cases.map((c) => c.name), 'case list changed; run npm run test:update-snapshots');
+  assert.deepEqual([...expected.keys()], cases.map((c) => c.name), 'case list changed; run UPDATE_SNAPSHOTS=1 bun test');
   for (const [i, c] of cases.entries()) {
     await t.test(c.name, () => assert.equal(outputs[i], expected.get(c.name)));
   }

@@ -11,8 +11,8 @@ import {
   readStdin,
   resolveModelName,
   stdinText,
-} from '../dist/stdin.js';
-import { formatUsd, getNativeCostUsd } from '../dist/cost.js';
+} from '../src/stdin.js';
+import { formatUsd, getNativeCostUsd } from '../src/cost.js';
 
 const usage = (input, cacheWrite = 0, cacheRead = 0) => ({
   input_tokens: input,

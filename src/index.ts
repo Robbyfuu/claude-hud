@@ -1,6 +1,4 @@
-import * as os from "node:os";
-import { realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { getHomeDir } from "./claude-config-dir.js";
 import { getUsageFromStdin, isContextUnreported, readStdin } from "./stdin.js";
 import { parseTranscript } from "./transcript.js";
 import { render } from "./render/index.js";
@@ -89,7 +87,7 @@ export async function main(): Promise<void> {
       costTotals: display.showDailyCost || display.showWeeklyCost
         ? getCostTotals(stdin, { allowRoutedCost: display.showRoutedCost, sevenDayResetAt: usageData?.sevenDayResetAt ?? null })
         : null,
-      outputSpeed: display.showSpeed ? getOutputSpeed(stdin, os.homedir()) : null,
+      outputSpeed: display.showSpeed ? getOutputSpeed(stdin, getHomeDir()) : null,
       gitStatus,
       usageData,
       memoryUsage,
@@ -102,13 +100,4 @@ export async function main(): Promise<void> {
   }
 }
 
-const isSamePath = (a: string, b: string): boolean => {
-  try {
-    return realpathSync(a) === realpathSync(b);
-  } catch {
-    return a === b;
-  }
-};
-if (process.argv[1] && isSamePath(process.argv[1], fileURLToPath(import.meta.url))) {
-  void main();
-}
+if (import.meta.main) void main();

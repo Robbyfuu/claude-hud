@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
-import { expandHomeDirPrefix, getClaudeConfigDir, getHudPluginDir } from './claude-config-dir.js';
+import { expandHomeDirPrefix, getClaudeConfigDir, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { createDebug } from './debug.js';
 import type { Language } from './i18n/types.js';
 import { MAX_TERMINAL_WIDTH } from './utils/terminal.js';
@@ -309,13 +308,13 @@ export const DEFAULT_CONFIG: HudConfig = {
 };
 
 export function getConfigPath(): string {
-  return path.join(getHudPluginDir(os.homedir()), 'config.json');
+  return path.join(getHudPluginDir(getHomeDir()), 'config.json');
 }
 
 // Lives outside plugins/, which users often symlink across several CLAUDE_CONFIG_DIRs,
 // so it stays per-directory and can override the shared config.
 export function getConfigOverridePath(): string {
-  return path.join(getClaudeConfigDir(os.homedir()), 'claude-hud.json');
+  return path.join(getClaudeConfigDir(getHomeDir()), 'claude-hud.json');
 }
 
 // A rule maps a raw user value to a valid one, or to the fallback (the default).
@@ -378,7 +377,7 @@ const barChar: Rule = (value, fallback) => {
 // Expands a leading ~ and ${VAR}; unset variables are left as written.
 const usagePath: Rule = (value) => (
   typeof value === 'string'
-    ? expandHomeDirPrefix(value.trim(), os.homedir())
+    ? expandHomeDirPrefix(value.trim(), getHomeDir())
       .replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name: string) => process.env[name] ?? match)
     : ''
 );
