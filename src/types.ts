@@ -1,9 +1,13 @@
 import type { HudConfig } from './config.js';
-import type { GitStatus } from './git.js';
+import type { GitRepoIdentity, GitStatus } from './git.js';
 import type { AuthInfo } from './auth.js';
+import type { CostTotals } from './daily-cost.js';
 
+// The statusline payload Claude Code writes to stdin (code.claude.com/docs/en/statusline).
 export interface StdinData {
   session_id?: string;
+  session_name?: string;
+  version?: string;
   transcript_path?: string;
   cwd?: string;
   workspace?: {
@@ -11,11 +15,14 @@ export interface StdinData {
     project_dir?: string;
     added_dirs?: string[];
     git_worktree?: string;
+    repo?: GitRepoIdentity;
   } | null;
   model?: {
     id?: string;
     display_name?: string;
   };
+  output_style?: { name?: string };
+  pr?: { number?: number | null; url?: string | null; review_state?: string | null } | null;
   context_window?: {
     context_window_size?: number;
     total_input_tokens?: number | null;
@@ -26,7 +33,6 @@ export interface StdinData {
       cache_creation_input_tokens?: number;
       cache_read_input_tokens?: number;
     } | null;
-    // Native percentage fields (Claude Code v2.1.6+)
     used_percentage?: number | null;
     remaining_percentage?: number | null;
   };
@@ -38,44 +44,24 @@ export interface StdinData {
     total_lines_removed?: number | null;
   } | null;
   rate_limits?: {
-    five_hour?: {
-      used_percentage?: number | null;
-      resets_at?: number | null;
-    } | null;
-    seven_day?: {
-      used_percentage?: number | null;
-      resets_at?: number | null;
-    } | null;
-    /**
-     * Model-scoped weekly windows (e.g. the Fable weekly quota shown on /usage).
-     * Additive field — Claude Code's internal status schema defines it as
-     * { display_name, utilization (0-100 percent), resets_at (ISO-8601) } and only
-     * includes it when the server returns per-model windows.
-     */
-    model_scoped?: Array<{
-      display_name?: string | null;
-      utilization?: number | null;
-      resets_at?: string | null;
-    }> | null;
+    five_hour?: RateLimitWindow | null;
+    seven_day?: RateLimitWindow | null;
+    spend_limit?: RateLimitWindow | null;
   } | null;
-  // Claude Code 2.1.115+ exposes effort as an object: { level: "max" }.
-  // Earlier versions (≤2.1.114) did not send this field at all. The bare-string
-  // shape is kept for backwards compatibility with the original PR #471 design
-  // that future-proofed a string form before Anthropic had committed a schema.
-  effort?: string | { level?: string | null; [key: string]: unknown } | null;
-  version?: string;
-  output_style?: { name?: string | null } | null;
-  // Main-conversation prompt cache stats (Claude Code v2.1.251+).
   prompt_cache?: {
-    warm?: boolean | null;
+    warm?: boolean;
+    caching_observed?: boolean;
+    ttl?: string;
+    expires_at?: number | null;
     hit_ratio?: number | null;
   } | null;
-  // Open pull request for the current branch.
-  pr?: {
-    number?: number | null;
-    url?: string | null;
-    review_state?: string | null;
-  } | null;
+  effort?: { level?: string } | null;
+  worktree?: { name?: string; path?: string; branch?: string } | null;
+}
+
+interface RateLimitWindow {
+  used_percentage?: number | null;
+  resets_at?: number | null;
 }
 
 export interface ToolEntry {
@@ -92,31 +78,11 @@ export interface AgentEntry {
   type: string;
   model?: string;
   description?: string;
-  // Addressable teammate name (Agent `name` input); matches idle notifications.
   name?: string;
   status: 'running' | 'completed';
   startTime: Date;
   endTime?: Date;
   background?: boolean;
-}
-
-/**
- * Per-subagent detail read from `<session>/subagents/agent-<id>.jsonl`.
- * Used by the `panel` layout's agent table.
- */
-export interface SubagentDetail {
-  // Skills preloaded by the agent definition plus skills invoked via the Skill tool.
-  skills: string[];
-  // Progress of the subagent's own task list (TaskCreate/TaskUpdate or TodoWrite).
-  todosDone: number;
-  todosTotal: number;
-  // Tool currently waiting for a result, or the last tool used.
-  currentTool?: { name: string; target?: string };
-  lastTool?: { name: string; target?: string };
-  toolCount: number;
-  // Input + cache tokens of the subagent's latest request (its context size).
-  contextTokens?: number;
-  lastActivityAt?: Date;
 }
 
 export interface TodoItem {
@@ -130,7 +96,7 @@ export interface UsageData {
   fiveHourResetAt: Date | null;
   sevenDayResetAt: Date | null;
   balanceLabel?: string | null;  // optional raw balance text (e.g. "¥6.35")
-  /** Model-scoped weekly windows (e.g. Fable) from stdin rate_limits.model_scoped. */
+  // Model-scoped weekly windows (e.g. Fable), from the external usage snapshot.
   scopedWindows?: ScopedUsageWindow[];
 }
 
@@ -152,11 +118,7 @@ export interface ExternalUsageSnapshot {
   } | null;
   updated_at?: string | number | null;
   balance_label?: string | null;
-  /**
-   * Model-scoped weekly windows (e.g. Fable). Mirrors the stdin
-   * `rate_limits.model_scoped` schema so external feeders can pass through
-   * the same shape Claude Code emits (e.g. from a get_usage response).
-   */
+  // Model-scoped weekly windows (e.g. Fable), in the shape of Claude Code's /usage data.
   model_scoped?: Array<{
     display_name?: string | null;
     utilization?: number | null;
@@ -185,8 +147,6 @@ export interface SessionTokenUsage {
 
 export interface TranscriptData {
   tools: ToolEntry[];
-  // Session-wide tool use counts by tool name (tools holds only the last 20).
-  toolCounts?: Record<string, number>;
   skills: string[];
   mcpServers: string[];
   /**
@@ -197,26 +157,19 @@ export interface TranscriptData {
   mcpErrors: string[];
   agents: AgentEntry[];
   todos: TodoItem[];
+  // Session-wide tool_use counts by name, main chain only.
+  toolCounts?: Record<string, number>;
   sessionStart?: Date;
-  sessionName?: string;
   // Last assistant response of any kind, subagents included. Drives the
   // last-response element.
   lastAssistantResponseAt?: Date;
-  // Start of the request that last read or wrote the main session's prompt
-  // cache, which is when its TTL began. Main-chain only and deliberately not
-  // the same value as lastAssistantResponseAt: see the prompt-cache block in
-  // parseTranscript for why each is measured the way it is.
-  promptCacheAnchorAt?: Date;
-  // TTL in seconds that same request used, read from its per-tier cache-write
-  // counters. Either 300 or 3600, or undefined when the session has not written
-  // a cache yet, in which case the default tier applies.
-  promptCacheTtlSeconds?: number;
   sessionTokens?: SessionTokenUsage;
-  lastCompactBoundaryAt?: Date;
-  lastCompactPostTokens?: number;
   // Number of compact_boundary entries (manual /compact or auto compaction)
   // with a valid timestamp seen in the transcript.
   compactionCount?: number;
+  // Tokens in the main conversation's context as of its last request, or the
+  // post-compaction size after a compact boundary.
+  contextTokens?: number;
   // Advisor model ID for the current session, captured from the top-level
   // `advisorModel` field that Claude Code stamps onto every assistant record
   // after `/advisor` is set (e.g. "claude-opus-4-7"). undefined when /advisor
@@ -233,6 +186,25 @@ export interface TranscriptData {
   lastAssistantModel?: string;
 }
 
+/**
+ * Per-subagent detail read from `<session>/subagents/agent-<id>.jsonl`.
+ * Used by the `panel` layout's agent table.
+ */
+export interface SubagentDetail {
+  // Skills preloaded by the agent definition plus skills invoked via the Skill tool.
+  skills: string[];
+  // Progress of the subagent's own task list (TaskCreate/TaskUpdate or TodoWrite).
+  todosDone: number;
+  todosTotal: number;
+  // Tool currently waiting for a result, or the last tool used.
+  currentTool?: { name: string; target?: string };
+  lastTool?: { name: string; target?: string };
+  toolCount: number;
+  // Input + cache tokens of the subagent's latest request (its context size).
+  contextTokens?: number;
+  lastActivityAt?: Date;
+}
+
 export interface RenderContext {
   stdin: StdinData;
   transcript: TranscriptData;
@@ -240,21 +212,14 @@ export interface RenderContext {
   rulesCount: number;
   mcpCount: number;
   hooksCount: number;
-  sessionDuration: string;
+  costTotals: CostTotals | null;
+  outputSpeed: number | null;
   gitStatus: GitStatus | null;
   usageData: UsageData | null;
   memoryUsage: MemoryInfo | null;
   config: HudConfig;
   extraLabel: string | null;
-  outputStyle?: string;
-  claudeCodeVersion?: string;
-  effortLevel?: string;
-  effortSymbol?: string;
-  // Auth method + account for the current login (see auth.ts). Only populated
-  // when display.showAuth or display.showAuthUser is enabled.
   authInfo?: AuthInfo | null;
-  // Subagent details keyed by the spawning tool_use id (panel layout only).
   subagents?: Map<string, SubagentDetail>;
-  // Token usage summed across every subagent transcript (panel layout only).
   subagentTokens?: SessionTokenUsage | null;
 }

@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { HudConfig } from './config.js';
 import type { AgentEntry, SessionTokenUsage, SubagentDetail } from './types.js';
-import { getClaudeConfigDir, getHomeDir } from './claude-config-dir.js';
+import { getClaudeConfigDir, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { parseTranscript } from './transcript.js';
 import { sanitizeDisplayText } from './utils/sanitize.js';
 import { createDebug } from './debug.js';
@@ -20,6 +22,7 @@ const MAX_NAME_LEN = 48;
 const MAX_TARGET_LEN = 80;
 const MAX_SKILLS = 8;
 const MAX_AGENT_DEF_FILES = 400;
+const MAX_COMPLETED_SHOWN = 2;
 
 // Bookkeeping tools that say nothing about what the agent is doing.
 const QUIET_TOOLS = new Set([
@@ -243,6 +246,7 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
     if (!Array.isArray(content)) continue;
 
     for (const block of content) {
+      if (!block || typeof block !== 'object') continue;
       if (block.type === 'tool_use' && block.id && block.name) {
         const input = block.input ?? {};
 
@@ -403,10 +407,15 @@ function agentDefinitionDirs(cwd: string | undefined, pluginName: string | undef
 
 /** Skills preloaded by an agent definition's `skills:` frontmatter. */
 export function readAgentDefinitionSkills(agentType: string, cwd?: string): string[] {
+  if (typeof agentType !== 'string') return [];
   const separator = agentType.lastIndexOf(':');
   const pluginName = separator > 0 ? agentType.slice(0, agentType.indexOf(':')) : undefined;
   const agentName = separator > 0 ? agentType.slice(separator + 1) : agentType;
   if (!agentName || agentName === 'general-purpose') return [];
+  // The plugin name becomes a path segment: reject anything that could leave the plugin cache.
+  if (pluginName !== undefined && (path.basename(pluginName) !== pluginName || pluginName === '..' || pluginName === '.')) {
+    return [];
+  }
 
   const budget = { left: MAX_AGENT_DEF_FILES };
   for (const dir of agentDefinitionDirs(cwd, pluginName)) {
@@ -429,9 +438,62 @@ export function readAgentDefinitionSkills(agentType: string, cwd?: string): stri
   return [];
 }
 
+interface TokenCacheEntry { size: number; mtimeMs: number; tokens: SessionTokenUsage }
+// Null-prototype so a `__proto__` key from the file is an inert own key, never a prototype.
+type TokenCache = Record<string, TokenCacheEntry>;
+const newTokenCache = (): TokenCache => Object.create(null) as TokenCache;
+
+const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+function isTokenCacheEntry(v: unknown): v is TokenCacheEntry {
+  if (!v || typeof v !== 'object') return false;
+  const e = v as TokenCacheEntry;
+  const t = e.tokens as Partial<SessionTokenUsage> | undefined;
+  return isCount(e.size) && isCount(e.mtimeMs) && !!t
+    && isCount(t.inputTokens) && isCount(t.outputTokens)
+    && isCount(t.cacheCreationTokens) && isCount(t.cacheReadTokens);
+}
+
+// ponytail: other sessions' cache files are never pruned (~100 bytes per subagent); prune files older than N days if the dir grows.
+function tokenCachePath(subagentsDir: string): string {
+  const key = createHash('sha1').update(subagentsDir).digest('hex').slice(0, 16);
+  return path.join(getHudPluginDir(getHomeDir()), 'subagent-tokens', `${key}.json`);
+}
+
+function readTokenCache(file: string): TokenCache {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: number; files?: Record<string, unknown> };
+    if (parsed.version !== 1 || !parsed.files || typeof parsed.files !== 'object') return newTokenCache();
+    const cache = newTokenCache();
+    for (const [name, entry] of Object.entries(parsed.files)) {
+      if (isTokenCacheEntry(entry)) cache[name] = entry;
+    }
+    return cache;
+  } catch {
+    return newTokenCache();
+  }
+}
+
+function writeTokenCache(file: string, cache: TokenCache): void {
+  const tmp = `${file}.${process.pid}.tmp`;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(tmp, JSON.stringify({ version: 1, files: cache }), { mode: 0o600 });
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    debug('Failed to write token cache:', err instanceof Error ? err.message : err);
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      // Nothing left to clean up.
+    }
+  }
+}
+
 /**
- * Token usage summed across every subagent transcript of the session. Reuses
- * parseTranscript, which dedupes per message and caches each file by mtime+size.
+ * Token usage summed across every subagent transcript of the session. Finished
+ * transcripts never change, so each file's totals are cached on disk by
+ * size + mtime and parsed once.
  */
 export async function readSubagentTokenTotals(transcriptPath: string): Promise<SessionTokenUsage | null> {
   if (!transcriptPath) return null;
@@ -443,15 +505,38 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     return null;
   }
   if (files.length === 0) return null;
-  const total: SessionTokenUsage = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+  const cacheFile = tokenCachePath(dir);
+  const cached = readTokenCache(cacheFile);
+  const next = newTokenCache();
+  const total: SessionTokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+  };
   for (const name of files) {
-    const tokens = (await parseTranscript(path.join(dir, name))).sessionTokens;
+    const file = path.join(dir, name);
+    let stat: fs.Stats | null = null;
+    try {
+      stat = fs.statSync(file);
+    } catch {
+      // Unstatable: parse without caching.
+    }
+    const hit = cached[name];
+    let tokens: SessionTokenUsage | undefined;
+    if (stat && hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) {
+      tokens = hit.tokens;
+    } else {
+      tokens = (await parseTranscript(file)).sessionTokens;
+    }
     if (!tokens) continue;
+    if (stat) next[name] = { size: stat.size, mtimeMs: stat.mtimeMs, tokens };
     total.inputTokens += tokens.inputTokens;
     total.outputTokens += tokens.outputTokens;
     total.cacheCreationTokens += tokens.cacheCreationTokens;
     total.cacheReadTokens += tokens.cacheReadTokens;
   }
+  if (JSON.stringify(next) !== JSON.stringify(cached)) writeTokenCache(cacheFile, next);
   return total;
 }
 
@@ -475,12 +560,37 @@ export function readSubagentDetails(
     const parsed = file ? parseSubagentTranscript(file) : null;
     const detail: SubagentDetail = parsed ?? { skills: [], todosDone: 0, todosTotal: 0, toolCount: 0 };
 
-    if (!definitionSkills.has(agent.type)) {
-      definitionSkills.set(agent.type, readAgentDefinitionSkills(agent.type, cwd));
+    // The type comes from an untrusted transcript cast; tolerate non-strings.
+    const agentType = typeof agent.type === 'string' ? agent.type : 'agent';
+    if (!definitionSkills.has(agentType)) {
+      definitionSkills.set(agentType, readAgentDefinitionSkills(agentType, cwd));
     }
-    const preloaded = definitionSkills.get(agent.type) ?? [];
+    const preloaded = definitionSkills.get(agentType) ?? [];
     detail.skills = Array.from(new Set([...preloaded, ...detail.skills])).slice(0, MAX_SKILLS);
     details.set(agent.id, detail);
   }
   return details;
+}
+
+export function selectPanelAgents(
+  agents: AgentEntry[],
+  config: Pick<HudConfig, 'panel'> | undefined,
+  now: number,
+): { shown: AgentEntry[]; hiddenRunning: number } {
+  const maxAgents = config?.panel?.maxAgents ?? 5;
+  const retentionMs = (config?.panel?.completedRetentionSeconds ?? 120) * 1000;
+
+  const running = agents.filter((agent) => agent.status === 'running');
+  const runningShown = running.slice(-maxAgents);
+  const completedSlots = Math.min(MAX_COMPLETED_SHOWN, maxAgents - runningShown.length);
+  const completed = completedSlots > 0
+    ? agents
+      .filter((agent) => {
+        const end = agent.endTime?.getTime();
+        return agent.status === 'completed' && end !== undefined && now - end <= retentionMs;
+      })
+      .slice(-completedSlots)
+    : [];
+
+  return { shown: [...runningShown, ...completed], hiddenRunning: running.length - runningShown.length };
 }

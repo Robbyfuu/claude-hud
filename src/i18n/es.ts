@@ -7,11 +7,12 @@ export const es: Messages = {
   "label.weekly": "Semanal",
   "label.approxRam": "RAM aprox.",
   "label.promptCache": "Caché",
+  "label.cacheHitRate": "Aciertos de caché",
   "label.rules": "reglas",
   "label.hooks": "hooks",
-  "label.estimatedCost": "Est.",
   "label.cost": "Costo",
   "label.today": "Hoy",
+  "label.week": "Semana",
   "label.tokens": "Tokens",
   "label.sessionStarted": "Inicio",
   "label.lastReply": "Última respuesta",
@@ -35,6 +36,7 @@ export const es: Messages = {
   "format.tokPerSec": "tok/s",
   "format.justNow": "recién",
   "format.relativeTime": "hace {value}",
+  "format.elapsed": "{value}% transcurrido",
 
   // Panel layout
   "panel.session": "sesión",

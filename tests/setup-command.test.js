@@ -32,6 +32,18 @@ test('setup runs Bun without project bunfig.toml or .env', async () => {
   assert.match(setup, /exec "\{RUNTIME_PATH\}" --config=\/dev\/null --env-file \/dev\/null /);
 });
 
+test('setup statusLine commands exit when plugin_dir is empty instead of running a relative path', async () => {
+  const setup = await readFile(new URL('../commands/setup.md', import.meta.url), 'utf8');
+  const commands = setup.split('\n').filter((line) => line.includes('exec "{RUNTIME_PATH}"'));
+
+  assert.ok(commands.length > 0, 'no statusLine command found');
+  for (const command of commands) {
+    // An empty plugin_dir would run the open project's src/index.ts on every refresh (#759).
+    const guard = command.indexOf('[ -n "$plugin_dir" ] || exit 0;');
+    assert.ok(guard !== -1 && guard < command.indexOf('exec "{RUNTIME_PATH}"'), command);
+  }
+});
+
 test('setup gates Windows before Step 0', async () => {
   const setup = await readFile(new URL('../commands/setup.md', import.meta.url), 'utf8');
 

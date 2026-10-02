@@ -6,7 +6,7 @@ export function getHomeDir(): string {
   return process.env.HOME || os.homedir();
 }
 
-function expandHomeDirPrefix(inputPath: string, homeDir: string): string {
+export function expandHomeDirPrefix(inputPath: string, homeDir: string): string {
   if (inputPath === '~') {
     return homeDir;
   }
@@ -24,8 +24,13 @@ export function getClaudeConfigDir(homeDir: string): string {
   return path.resolve(expandHomeDirPrefix(envConfigDir, homeDir));
 }
 
+// Claude Code keeps .claude.json inside CLAUDE_CONFIG_DIR when it is set, otherwise in the home directory.
 export function getClaudeConfigJsonPath(homeDir: string): string {
-  return `${getClaudeConfigDir(homeDir)}.json`;
+  const envConfigDir = process.env.CLAUDE_CONFIG_DIR?.trim();
+  if (!envConfigDir) {
+    return path.join(homeDir, '.claude.json');
+  }
+  return path.join(getClaudeConfigDir(homeDir), '.claude.json');
 }
 
 export function getHudPluginDir(homeDir: string): string {
