@@ -20,7 +20,7 @@ Inside Claude Code, run:
 /claude-hud:setup
 ```
 
-`/claude-hud:setup` points your status line at the HUD. Claude Code reloads settings on its own, so the HUD appears after your next message.
+`/claude-hud:setup` points your status line at the HUD. Claude Code reloads settings on its own, so the HUD appears right away. To customize it, ask Claude or run `/claude-hud:configure`.
 
 <details>
 <summary><strong>Prefer the terminal?</strong></summary>

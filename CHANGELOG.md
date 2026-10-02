@@ -4,6 +4,11 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- A folder name containing ` │ ` no longer leaves the project link open over the rest of the HUD when line 1 wraps.
+
+## [0.10.0] - 2026-10-01
+
 This release is a rewrite for simplicity, with the same options in about half the source and a quarter of the test code. It needs Claude Code v2.1.260 or later.
 
 ### Changed
@@ -15,10 +20,9 @@ This release is a rewrite for simplicity, with the same options in about half th
 - Session duration is Claude Code's running time for the session.
 - Git status comes from one `git status --porcelain=v2` call, down from four or five, and the branch link comes from `workspace.repo`. A repository with no commits now shows its branch.
 - The compact layout gains expanded's branch link and push-threshold colours, and `display.timeFormat: "elapsed"` now works there.
-- `/claude-hud:setup` installs a small launcher and writes `settings.json` with a helper script instead of hand-built shell commands. Existing setups keep working; re-run setup to switch. (Not applicable to the fork: setup keeps its Bun command and does not ship the launcher.)
+- `/claude-hud:setup` installs a small launcher and writes `settings.json` with a helper script instead of hand-built shell commands. Existing setups keep working; re-run setup to switch. It asks nothing unless it would replace another status line; customize afterwards by asking Claude or with `/claude-hud:configure`. A `refreshInterval` you set yourself is kept. (Not applicable to the fork: setup keeps its Bun command, does not ship the launcher, and still offers the refresh interval and optional features.)
 - `/claude-hud:configure` asks one short set of questions and previews the diff.
 - The default HUD no longer parses the transcript, runs `claude --version`, or keeps context or transcript caches on disk. (True for the default layouts in this fork; the `panel` layout caches subagent token totals under `plugins/claude-hud/subagent-tokens/`.)
-
 - The `panel` layout is rebuilt on upstream's render engine (`Frame` and the shared width measurement). (Fork only.)
 - The panel caches per-subagent token totals, so finished subagent transcripts are parsed once. (Fork only.)
 - Dead background agent detection is kept on top of upstream's transcript parsing. (Fork only.)

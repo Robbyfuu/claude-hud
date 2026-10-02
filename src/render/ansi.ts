@@ -141,8 +141,12 @@ function splitAtSeparators(line: string): WrapPart[] {
   let separator = '';
   let partStart = 0;
   let offset = 0;
+  let inLink = false;
   for (const token of tokenize(line)) {
-    if (!token.escape) {
+    if (token.escape) {
+      const url = /^\x1b\]8;;([^\x07\x1b]*)/.exec(token.text)?.[1];
+      if (url !== undefined) inLink = url !== '';
+    } else if (!inLink) {
       for (const match of token.text.matchAll(SEPARATOR)) {
         const at = offset + (match.index ?? 0);
         parts.push({ separator, text: line.slice(partStart, at) });

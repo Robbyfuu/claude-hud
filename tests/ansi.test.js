@@ -58,6 +58,15 @@ test('separators inside escape sequences are not break points', () => {
   assert.deepEqual(wrapToWidth(line, 8).map(plain), ['linked', 'next']);
 });
 
+test('a separator inside link text is not a break point, so no line leaves a link open', () => {
+  const lines = wrapToWidth(`${link('file:///tmp/a%20b', 'a │ b-project')} │ next`, 8);
+  assert.deepEqual(lines.map(plain), ['a │ b...', 'next']);
+  for (const line of lines) {
+    const urls = [...line.matchAll(/\x1b\]8;;([^\x07\x1b]*)/g)].map((m) => m[1]);
+    assert.ok(urls.length === 0 || urls.at(-1) === '', `link left open: ${JSON.stringify(line)}`);
+  }
+});
+
 test('an unbreakable part is truncated with an ellipsis and a reset', () => {
   const [line] = wrapToWidth(`\x1b[33m${'x'.repeat(30)}\x1b[0m`, 10);
   assert.equal(plain(line), 'xxxxxxx...');

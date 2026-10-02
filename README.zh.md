@@ -20,7 +20,7 @@
 /claude-hud:setup
 ```
 
-`/claude-hud:setup` 会把状态栏指向 HUD。Claude Code 会自动重新加载设置，HUD 在你发送下一条消息后出现。
+`/claude-hud:setup` 会把状态栏指向 HUD。Claude Code 会自动重新加载设置，HUD 会立即出现。想要自定义，直接告诉 Claude，或运行 `/claude-hud:configure`。
 
 <details>
 <summary><strong>更喜欢用终端？</strong></summary>
