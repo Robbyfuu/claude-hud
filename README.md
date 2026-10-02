@@ -243,6 +243,8 @@ Set `"lineLayout": "panel"` for a boxed dashboard sized to the terminal width:
 The session box's last row adds the session's token total after the cost, including every subagent transcript, with the share read from cache: `139M tok (94% cache)`.
 When starting fresh would help, a fifth row shows one hint, highest priority first: `↻ new session · context 87%` (context at or above `display.contextCriticalThreshold`), `↻ new session · cold cache, rewrites 659k` (prompt cache cold with at least 200k context tokens), or `↻ new session soon · context 72%` (context at or above `display.contextWarningThreshold`).
 
+Finished subagent transcripts are parsed once: the panel caches their token totals under `plugins/claude-hud/subagent-tokens/` and re-reads a transcript only when its size or modification time changes.
+
 The agent table reads each subagent's own transcript (`<session>/subagents/agent-<id>.jsonl`):
 
 - **SKILLS**: skills preloaded by the agent definition's `skills:` frontmatter plus skills the agent invoked with the Skill tool.
@@ -288,7 +290,7 @@ Any value other than `0`, `false`, `off`, or `no` blanks the HUD for that sessio
 
 ## Security
 
-Claude HUD is local-only. It makes no network requests, never reads credentials, and calls no undocumented APIs. It reads Claude Code's stdin, the session transcript, Claude configuration files, and git or jj metadata for the current directory. Its only writes are small state files (output speed and the cost ledger) under `~/.claude/plugins/claude-hud`, with private permissions.
+Claude HUD is local-only. It makes no network requests, never reads credentials, and calls no undocumented APIs. It reads Claude Code's stdin, the session transcript, Claude configuration files, and git or jj metadata for the current directory. Its only writes are small state files (output speed and the cost ledger) under `~/.claude/plugins/claude-hud`, with private permissions. With `lineLayout: "panel"` it also keeps `subagent-tokens/<hash>.json` there: one file per session that has subagents, holding per-subagent token totals keyed by transcript file name, size and modification time (directories 0700, files 0600). These files are never pruned; delete the folder to clear them.
 
 `--extra-cmd` runs a shell command on every refresh and puts its output on the first line. It is ignored unless `CLAUDE_HUD_ALLOW_EXTRA_CMD=1` is set in the HUD's environment. Treat it as arbitrary code execution and never use a command from an untrusted source.
 

@@ -255,7 +255,7 @@ CLAUDE_HUD_DISABLE=1 claude
 
 ## 安全
 
-Claude HUD 只在本地运行。它不发起网络请求，从不读取凭据，也不调用未公开的 API。它读取 Claude Code 的 stdin、会话 transcript、Claude 配置文件以及当前目录的 git 或 jj 元数据。它唯一写入的是 `~/.claude/plugins/claude-hud` 下的少量状态文件（输出速度和费用账本），并使用私有权限。
+Claude HUD 只在本地运行。它不发起网络请求，从不读取凭据，也不调用未公开的 API。它读取 Claude Code 的 stdin、会话 transcript、Claude 配置文件以及当前目录的 git 或 jj 元数据。它唯一写入的是 `~/.claude/plugins/claude-hud` 下的少量状态文件（输出速度和费用账本），并使用私有权限。使用 `lineLayout: "panel"` 时，还会在同一目录下保存 `subagent-tokens/<hash>.json`：每个含有子代理的会话对应一个文件，记录各子代理的 token 总量，以 transcript 文件名、大小和修改时间为键（目录权限 0700，文件权限 0600）。这些文件不会被自动清理；删除该文件夹即可清除。
 
 `--extra-cmd` 会在每次刷新时运行一条 shell 命令，并把输出显示在第一行。除非 HUD 的环境中设置了 `CLAUDE_HUD_ALLOW_EXTRA_CMD=1`，否则它会被忽略。请把它视为任意代码执行，切勿使用来源不可信的命令。
 

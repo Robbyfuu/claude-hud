@@ -17,9 +17,19 @@ This release is a rewrite for simplicity, with the same options in about half th
 - The compact layout gains expanded's branch link and push-threshold colours, and `display.timeFormat: "elapsed"` now works there.
 - `/claude-hud:setup` installs a small launcher and writes `settings.json` with a helper script instead of hand-built shell commands. Existing setups keep working; re-run setup to switch. (Not applicable to the fork: setup keeps its Bun command and does not ship the launcher.)
 - `/claude-hud:configure` asks one short set of questions and previews the diff.
-- The default HUD no longer parses the transcript, runs `claude --version`, or keeps context or transcript caches on disk.
+- The default HUD no longer parses the transcript, runs `claude --version`, or keeps context or transcript caches on disk. (True for the default layouts in this fork; the `panel` layout caches subagent token totals under `plugins/claude-hud/subagent-tokens/`.)
+
+- The `panel` layout is rebuilt on upstream's render engine (`Frame` and the shared width measurement). (Fork only.)
+- The panel caches per-subagent token totals, so finished subagent transcripts are parsed once. (Fork only.)
+- Dead background agent detection is kept on top of upstream's transcript parsing. (Fork only.)
+- The `es` locale is kept. (Fork only.)
+- Config counts (CLAUDE.md, rules, MCP, hooks) are always gathered for the `panel` layout, whose environment box always shows them. (Fork only.)
+- `/claude-hud:configure` offers the `panel` layout and the Spanish language, so reconfiguring no longer drops them. (Fork only.)
 
 ### Fixed
+- Panel: a non-string subagent type or a `null` content block in a transcript no longer blanks the whole HUD with an error. (Fork only.)
+- Panel: a plugin name containing path segments can no longer make the HUD read agent definitions outside the plugin cache. (Fork only.)
+- Panel: tools named like `Object.prototype` members, such as `constructor`, are counted correctly in the tools row. (Fork only.)
 - Run Bun with `--config=/dev/null` in the generated statusline command and in setup's `settings.json` readers, so a project's `bunfig.toml` `preload` cannot print into the statusline.
 - The macOS memory reading no longer blocks the rest of the render.
 - The daily cost ledger no longer throws on a non-string `session_id`.
