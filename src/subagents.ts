@@ -433,7 +433,9 @@ export function readAgentDefinitionSkills(agentType: string, cwd?: string): stri
 }
 
 interface TokenCacheEntry { size: number; mtimeMs: number; tokens: SessionTokenUsage }
+// Null-prototype so a `__proto__` key from the file is an inert own key, never a prototype.
 type TokenCache = Record<string, TokenCacheEntry>;
+const newTokenCache = (): TokenCache => Object.create(null) as TokenCache;
 
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
@@ -455,14 +457,14 @@ function tokenCachePath(subagentsDir: string): string {
 function readTokenCache(file: string): TokenCache {
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: number; files?: Record<string, unknown> };
-    if (parsed.version !== 1 || !parsed.files || typeof parsed.files !== 'object') return {};
-    const cache: TokenCache = {};
+    if (parsed.version !== 1 || !parsed.files || typeof parsed.files !== 'object') return newTokenCache();
+    const cache = newTokenCache();
     for (const [name, entry] of Object.entries(parsed.files)) {
       if (isTokenCacheEntry(entry)) cache[name] = entry;
     }
     return cache;
   } catch {
-    return {};
+    return newTokenCache();
   }
 }
 
@@ -499,7 +501,7 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
   if (files.length === 0) return null;
   const cacheFile = tokenCachePath(dir);
   const cached = readTokenCache(cacheFile);
-  const next: TokenCache = {};
+  const next = newTokenCache();
   const total: SessionTokenUsage = {
     inputTokens: 0,
     outputTokens: 0,

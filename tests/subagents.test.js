@@ -322,3 +322,25 @@ test('readSubagentTokenTotals ignores a corrupt cache file', async () => {
     assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
   });
 });
+
+test('readSubagentTokenTotals ignores cache entries smuggled through a __proto__ key', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    const file = path.join(subagentsDir, 'agent-a.jsonl');
+    await writeJsonl(file, [usageLine('msg_a1', 10, 20, 30, 40)]);
+    const { size, mtimeMs } = fs.statSync(file);
+    const bad = `{"size":${size},"mtimeMs":${mtimeMs},"tokens":{"inputTokens":"\\u001b[31mX","outputTokens":-5,"cacheCreationTokens":0,"cacheReadTokens":"7"}}`;
+    const cacheFile = tokenCachePath(subagentsDir);
+    fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+    fs.writeFileSync(cacheFile, `{"version":1,"files":{"__proto__":{"size":1,"mtimeMs":1,"tokens":{"inputTokens":1,"outputTokens":1,"cacheCreationTokens":1,"cacheReadTokens":1},"agent-a.jsonl":${bad}}}}`);
+    assert.deepEqual(await readSubagentTokenTotals(transcriptPath), {
+      inputTokens: 10,
+      outputTokens: 20,
+      cacheCreationTokens: 30,
+      cacheReadTokens: 40,
+    });
+    assert.doesNotMatch(fs.readFileSync(cacheFile, 'utf8'), /__proto__/);
+  });
+});
