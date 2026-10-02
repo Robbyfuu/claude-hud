@@ -130,7 +130,7 @@ class Parser {
   // Background agents die with their Claude Code process; teammates report it as an idle notification.
   private lastProcessStart: Date | undefined;
   private teammateIdle: { name: string; at: Date }[] = [];
-  private toolCounts: Record<string, number> = {};
+  private toolCounts: Record<string, number> = Object.create(null); // null prototype: tool names are untrusted keys
   // Claude Code logs one API response several times, sometimes non-adjacently, so usage
   // is the per-field max per message id. Ids evicted to bound memory settle into `settled`.
   private usageById = new Map<string, SessionTokenUsage>();

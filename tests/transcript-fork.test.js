@@ -141,6 +141,21 @@ test('parseTranscript does not count agent, todo and task-management tools in to
   await withTempDir(async (dir) => {
     const file = path.join(dir, 'main.jsonl');
     await writeJsonl(file, entries);
-    assert.deepEqual((await parseTranscript(file)).toolCounts, { Bash: 2 });
+    assert.deepEqual({ ...(await parseTranscript(file)).toolCounts }, { Bash: 2 });
+  });
+});
+
+test('parseTranscript counts tools named like Object.prototype members', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'main.jsonl');
+    await writeJsonl(file, [
+      toolUse('p1', 'constructor', {}), toolResult('p1'),
+      toolUse('p2', 'constructor', {}), toolResult('p2'),
+      toolUse('p3', 'toString', {}), toolResult('p3'),
+    ]);
+    const { toolCounts } = await parseTranscript(file);
+    assert.equal(toolCounts.constructor, 2);
+    assert.equal(toolCounts.toString, 1);
+    assert.deepEqual({ ...toolCounts }, { constructor: 2, toString: 1 });
   });
 });
