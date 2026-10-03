@@ -728,6 +728,13 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
   const runningCount = agents.filter((a) => a.status === 'running').length;
   const doneCount = agents.length - runningCount;
 
+  const counts = Object.entries(f.transcript.toolCounts ?? {})
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const toolsLabel = label('panel.tools');
+  const left: Line = [s(toolsLabel, PALETTE.dim), sp(2)];
+  const shortCounts = new Map<string, number>();
+  for (const [name] of counts) shortCounts.set(shortToolName(name), (shortCounts.get(shortToolName(name)) ?? 0) + 1);
+
   const right: Line = [];
   if (agents.length > 0) {
     const runningKey: MessageKey = runningCount === 1 ? 'panel.agentsRunningOne' : 'panel.agentsRunning';
@@ -739,17 +746,16 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
     const sub = sum(f.subagentTokens);
     if (main > 0 && sub > 0) {
       const percent = Math.round((100 * sub) / (main + sub));
-      right.push(s(` · ${interpolate(label('panel.agentShare'), { percent })}`, PALETTE.dim));
+      const share = s(` · ${interpolate(label('panel.agentShare'), { percent })}`, PALETTE.dim);
+      // The share is the first thing to go: keep it only while the tools row still shows its top tool.
+      const top = counts[0];
+      const topWidth = top
+        ? textWidth(shortToolName(top[0])) + 1 + String(top[1]).length + (counts.length > 1 ? textWidth(`  +${counts.length - 1}`) : 0)
+        : textWidth(label('panel.noActivity'));
+      if (innerWidth - lineWidth(right) - lineWidth([share]) - 2 - lineWidth(left) >= topWidth) right.push(share);
     }
   }
-
-  const counts = Object.entries(f.transcript.toolCounts ?? {})
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const toolsLabel = label('panel.tools');
   const leftBudget = innerWidth - lineWidth(right) - (right.length > 0 ? 2 : 0);
-  const left: Line = [s(toolsLabel, PALETTE.dim), sp(2)];
-  const shortCounts = new Map<string, number>();
-  for (const [name] of counts) shortCounts.set(shortToolName(name), (shortCounts.get(shortToolName(name)) ?? 0) + 1);
   if (counts.length === 0) {
     left.push(s(label('panel.noActivity'), PALETTE.dim));
   } else {

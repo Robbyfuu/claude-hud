@@ -820,6 +820,24 @@ test('renderPanel shows no agent share without subagent tokens or without main t
   }
 });
 
+test('renderPanel drops the agent share before it hides every tool name', () => {
+  setLanguage('es');
+  try {
+    const NOW = Date.now();
+    const ctx = shareCtx(tokensOf(100), tokensOf(300), NOW);
+    ctx.transcript.toolCounts = { Bash: 3, Read: 2, Edit: 1 };
+    const line = runningLine(ctx, NOW, 70);
+    assert.match(line, /Bash 3/, line);
+    assert.doesNotMatch(line, /tokens de agentes/, line);
+    // With room to spare, the share and the tools both stay.
+    const wide = runningLine(ctx, NOW, 154);
+    assert.match(wide, /Bash 3/, wide);
+    assert.match(wide, /75% tokens de agentes/, wide);
+  } finally {
+    setLanguage('en');
+  }
+});
+
 test('renderPanel speaks Spanish in the agent share', () => {
   setLanguage('es');
   try {
