@@ -680,3 +680,34 @@ test('renderPanel shows the short MCP tool name in the NOW cell', () => {
   assert.match(line, /do_thing now/);
   assert.doesNotMatch(line, /mcp__|x:do_thing/);
 });
+
+// --- opaque worktree ids ---
+
+function projectLine(worktree, now, icons) {
+  const ctx = makeCtx({}, now);
+  ctx.stdin.workspace = { project_dir: '/work/quahog', git_worktree: worktree };
+  if (icons) ctx.config = mergeConfig({ lineLayout: 'panel', panel: { icons } });
+  return panelLines(createFrame(ctx, 154, now)).map(stripAnsi).find((l) => l.includes('quahog'));
+}
+
+test('renderPanel drops an opaque UUID worktree name and keeps the glyph', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = projectLine('42254-ecedf77f-d4f7-4603-89c1-18dcf752e131', NOW);
+  assert.match(line, /quahog ⎇ /);
+  assert.doesNotMatch(line, /ecedf77f|42254/);
+});
+
+test('renderPanel keeps a readable worktree name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  assert.match(projectLine('feat-auth', NOW), /quahog ⎇ feat-auth/);
+});
+
+test('renderPanel shows only the nerd worktree glyph for a UUID worktree name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = projectLine('42254-ecedf77f-d4f7-4603-89c1-18dcf752e131', NOW, 'nerd');
+  assert.match(line, /quahog  /);
+  assert.doesNotMatch(line, /ecedf77f|42254|⎇/);
+});

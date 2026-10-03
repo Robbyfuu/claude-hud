@@ -65,6 +65,8 @@ const CACHE_EXPIRY_MAX_MS = 24 * 3_600_000;
 // A running agent with no pending tool and no transcript activity this long is stalled.
 const STALL_MS = 5 * 60_000;
 
+const OPAQUE_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 // ---------------------------------------------------------------------------
 // Styled text
 
@@ -287,7 +289,9 @@ function sessionRows(f: Frame): Line[] {
   if (addedDirs > 0) projectRow.push(s(` +${addedDirs}`, PALETTE.dim));
   if (stdin.workspace?.git_worktree) {
     const worktreeGlyph = f.config?.panel?.icons === 'nerd' ? NERD_ICONS.worktree : '⎇';
-    projectRow.push(s(` ${worktreeGlyph} ${clean(stdin.workspace.git_worktree)}`, PALETTE.dim));
+    // Opaque ids (Orca worktrees carry a UUID) add nothing the project label lacks.
+    const worktree = clean(stdin.workspace.git_worktree);
+    projectRow.push(s(OPAQUE_ID.test(worktree) ? ` ${worktreeGlyph}` : ` ${worktreeGlyph} ${worktree}`, PALETTE.dim));
   }
 
   const git = f.gitStatus;
