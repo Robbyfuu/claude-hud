@@ -231,3 +231,15 @@ test('parseTranscript counts tools named like Object.prototype members', async (
     assert.deepEqual({ ...toolCounts }, { constructor: 2, toString: 1 });
   });
 });
+
+test('parseTranscript does not count sidechain tool_use entries in toolCounts', async () => {
+  const entries = [
+    toolUse('b1', 'Bash', { command: 'ls' }),
+    { ...toolUse('b2', 'Bash', { command: 'ls' }), isSidechain: true },
+  ];
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'main.jsonl');
+    await writeJsonl(file, entries);
+    assert.deepEqual({ ...(await parseTranscript(file)).toolCounts }, { Bash: 1 });
+  });
+});

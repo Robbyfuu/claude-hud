@@ -467,3 +467,37 @@ test('readSubagentTokenTotals does not cache a non-empty transcript that parsed 
     assert.equal('agent-b.jsonl' in cache.files, true);
   });
 });
+
+async function cacheKeyScenario(mutate) {
+  return withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    const file = path.join(subagentsDir, 'agent-a.jsonl');
+    await writeJsonl(file, [usageLine('msg_a1', 10, 20, 30, 40)]);
+    fs.utimesSync(file, 1_700_000_000, 1_700_000_000); // whole-second mtime so it can be restored exactly
+    await readSubagentTokenTotals(transcriptPath);
+    const cacheFile = tokenCachePath(subagentsDir);
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    cache.files['agent-a.jsonl'].tokens.inputTokens = 777; // sentinel: shows up only on a cache hit
+    fs.writeFileSync(cacheFile, JSON.stringify(cache));
+    const before = fs.statSync(file);
+    mutate(file, before);
+    return (await readSubagentTokenTotals(transcriptPath)).inputTokens;
+  });
+}
+
+test('readSubagentTokenTotals re-parses when only the mtime changed', async () => {
+  const input = await cacheKeyScenario((file, st) => {
+    fs.utimesSync(file, st.atime, new Date(st.mtimeMs + 5000));
+  });
+  assert.equal(input, 10);
+});
+
+test('readSubagentTokenTotals re-parses when only the size changed', async () => {
+  const input = await cacheKeyScenario((file, st) => {
+    fs.appendFileSync(file, '\n');
+    fs.utimesSync(file, 1_700_000_000, 1_700_000_000);
+  });
+  assert.equal(input, 10);
+});

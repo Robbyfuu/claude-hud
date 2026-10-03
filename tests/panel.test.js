@@ -776,3 +776,12 @@ test('renderPanel renders the provided panelAgents instead of recomputing the se
   ctx.panelAgents = { shown: [stale], hiddenRunning: 0 };
   assert.ok(agentLine(ctx, NOW));
 });
+
+test('renderPanel falls back to the transcript start for the session duration, measured from f.now', () => {
+  setLanguage('en');
+  const NOW = Date.parse('2026-01-01T12:00:00.000Z'); // far from the real clock
+  const ctx = makeCtx({}, NOW);
+  ctx.stdin.cost = { ...ctx.stdin.cost, total_duration_ms: undefined };
+  ctx.transcript.sessionStart = new Date(NOW - 65 * 60_000);
+  assert.match(statsLine(ctx, NOW), /^│ 1h 5m · \$4\.82/);
+});
