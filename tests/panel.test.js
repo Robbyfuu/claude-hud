@@ -328,6 +328,56 @@ test('renderPanel grades the weekly pace against the 7-day window', () => {
   assert.ok(line.includes(`\x1b[1;${RED}m60%▲`), stripAnsi(line));
 });
 
+const namedCtx = (sessionName, now, display = { showSessionName: true }) => {
+  const ctx = makeCtx({ config: mergeConfig({ lineLayout: 'panel', display }) }, now);
+  ctx.stdin.session_name = sessionName;
+  return ctx;
+};
+
+test('renderPanel shows the session name in the session box title', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const plain = panelLines(createFrame(namedCtx('auth-fix', NOW), 154, NOW)).map(stripAnsi);
+  assert.match(plain[0], /^╭─ session · auth-fix ─+╮ ╭─ usage /);
+});
+
+test('renderPanel truncates a long session name and keeps every line at the panel width', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const name = 'refactor-the-authentication-flow-and-token-refresh-'.repeat(4);
+  for (const columns of [154, 100, 64]) {
+    const lines = panelLines(createFrame(namedCtx(name, NOW), columns, NOW));
+    const widths = new Set(lines.map(visibleWidth));
+    assert.deepEqual([...widths], [columns - 4], `columns ${columns}`);
+    assert.match(stripAnsi(lines[0]), /^╭─ session · refactor-the-[^╮]*… ─╮/, `columns ${columns}`);
+  }
+});
+
+test('renderPanel sanitizes control and ANSI characters in the session name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const lines = panelLines(createFrame(namedCtx('\x1b[31mauth\x07-fix‮\x1b]8;;http://x\x07', NOW), 154, NOW));
+  assert.equal(new Set(lines.map(visibleWidth)).size, 1);
+  assert.match(stripAnsi(lines[0]), /^╭─ session · auth-fix ─+╮ /);
+  assert.ok(!lines[0].includes('\x1b[31m') && !lines[0].includes('\x07') && !lines[0].includes('‮'));
+});
+
+test('renderPanel keeps the plain session title without the option or a usable name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const cases = [
+    namedCtx('auth-fix', NOW, {}),
+    namedCtx('auth-fix', NOW, { showSessionName: false }),
+    namedCtx(undefined, NOW),
+    namedCtx('   ', NOW),
+    namedCtx('\x1b[31m\x07', NOW),
+  ];
+  for (const ctx of cases) {
+    const first = stripAnsi(panelLines(createFrame(ctx, 154, NOW))[0]);
+    assert.match(first, /^╭─ session ─+╮ ╭─ usage /, JSON.stringify(ctx.stdin.session_name));
+  }
+});
+
 test('renderPanel uses Nerd Font icons only when enabled', () => {
   const NOW = Date.now();
   const nerd = makeCtx({ config: mergeConfig({ lineLayout: 'panel', panel: { icons: 'nerd' } }) }, NOW);

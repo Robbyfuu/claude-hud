@@ -719,8 +719,9 @@ export function panelLines(f: Frame): string[] {
   const columns = f.width ?? DEFAULT_WIDTH;
   const width = Math.max(40, Math.min(MAX_PANEL_WIDTH, f.config?.maxWidth ?? MAX_PANEL_WIDTH, columns - EDGE_MARGIN));
 
+  const sessionName = f.config?.display?.showSessionName === true ? clean(f.stdin.session_name) : '';
   const titles = {
-    session: label('panel.session'),
+    session: sessionName ? `${label('panel.session')} · ${sessionName}` : label('panel.session'),
     usage: label('panel.usage'),
     environment: label('panel.environment'),
     activity: label('panel.activity'),
