@@ -791,3 +791,156 @@ test('renderPanel falls back to the transcript start for the session duration, m
   ctx.transcript.sessionStart = new Date(NOW - 65 * 60_000);
   assert.match(statsLine(ctx, NOW), /^│ 1h 5m · \$4\.82/);
 });
+
+// --- subagent share of tokens ---
+
+const shareCtx = (main, sub, now) => {
+  const ctx = makeCtx({ subagentTokens: sub }, now);
+  ctx.transcript.sessionTokens = main;
+  return ctx;
+};
+const tokensOf = (total) => ({ inputTokens: total, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 });
+const runningLine = (ctx, now, columns = 154) =>
+  panelLines(createFrame(ctx, columns, now)).map(stripAnsi).find((l) => /running|activo/.test(l));
+
+test('renderPanel shows the subagent share of tokens next to the agent counts', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = runningLine(shareCtx(tokensOf(100), tokensOf(300), NOW), NOW);
+  assert.match(line, /1 running · 1 done · 75% tokens by agents/);
+  const raw = panelLines(createFrame(shareCtx(tokensOf(100), tokensOf(300), NOW), 154, NOW)).find((l) => l.includes('75% tokens'));
+  assert.ok(raw.includes(`\x1b[${DIM}m · 75% tokens by agents`), stripAnsi(raw));
+});
+
+test('renderPanel shows no agent share without subagent tokens or without main tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const ctx of [shareCtx(tokensOf(100), null, NOW), shareCtx(tokensOf(100), tokensOf(0), NOW), shareCtx(tokensOf(0), tokensOf(300), NOW)]) {
+    assert.doesNotMatch(runningLine(ctx, NOW), /tokens by agents/);
+  }
+});
+
+test('renderPanel drops the agent share before it hides every tool name', () => {
+  setLanguage('es');
+  try {
+    const NOW = Date.now();
+    const ctx = shareCtx(tokensOf(100), tokensOf(300), NOW);
+    ctx.transcript.toolCounts = { Bash: 3, Read: 2, Edit: 1 };
+    const line = runningLine(ctx, NOW, 70);
+    assert.match(line, /Bash 3/, line);
+    assert.doesNotMatch(line, /tokens de agentes/, line);
+    // With room to spare, the share and the tools both stay.
+    const wide = runningLine(ctx, NOW, 154);
+    assert.match(wide, /Bash 3/, wide);
+    assert.match(wide, /75% tokens de agentes/, wide);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('renderPanel budgets the colliding server:tool name before keeping the agent share', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = shareCtx(tokensOf(100), tokensOf(300), NOW);
+  ctx.transcript.toolCounts = { mcp__verylongserver__same: 3, mcp__b__same: 2 };
+  for (const columns of [70, 82, 100, 154]) {
+    const line = runningLine(ctx, NOW, columns);
+    assert.match(line, /verylongserver:same 3/, `${columns}: ${line}`);
+  }
+});
+
+test('renderPanel speaks Spanish in the agent share', () => {
+  setLanguage('es');
+  try {
+    const NOW = Date.now();
+    assert.match(runningLine(shareCtx(tokensOf(100), tokensOf(300), NOW), NOW), /75% tokens de agentes/);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('renderPanel keeps every line one width with the agent share', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const width of [70, 100, 140]) {
+    const lines = panelLines(createFrame(shareCtx(tokensOf(100), tokensOf(300), NOW), width, NOW));
+    assert.equal(new Set(lines.map(cellWidth)).size, 1, `width ${width}`);
+  }
+});
+
+// --- prompt-cache misses ---
+
+test('renderPanel appends prompt-cache misses and rewritten tokens, amber from 200k', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000, misses: 3, miss_recache_tokens: 284_396 }, NOW), NOW);
+  assert.match(stripAnsi(line), /cache 92% ● 47m · 3✗ 284k +│$/);
+  assert.ok(line.includes(`\x1b[${AMBER}m · 3✗ 284k`), stripAnsi(line));
+});
+
+test('renderPanel dims prompt-cache misses below 200k rewritten tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, misses: 2, miss_recache_tokens: 50_000 }, NOW), NOW);
+  assert.ok(line.includes(`\x1b[${DIM}m · 2✗ 50k`), stripAnsi(line));
+});
+
+test('renderPanel omits the miss token part when miss_recache_tokens is not a positive number', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const miss_recache_tokens of [undefined, 0, '5', null]) {
+    const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, misses: 2, miss_recache_tokens }, NOW), NOW));
+    assert.match(line, /cache 92% ● · 2✗ +│$/, String(miss_recache_tokens));
+    assert.doesNotMatch(line, /2✗ \S/);
+  }
+});
+
+test('renderPanel shows no cache misses for zero, negative, fractional or non-number counts', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const misses of [0, -1, 1.5, '3', null, undefined, JSON.parse('1e400')]) {
+    const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, misses, miss_recache_tokens: 284_396 }, NOW), NOW));
+    assert.doesNotMatch(line, /✗/, String(misses));
+  }
+});
+
+test('renderPanel shows cache misses after the cold rewrite segment', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4, misses: 1, miss_recache_tokens: 9_000 }, NOW, 300_000), NOW));
+  assert.match(line, /cache 40% ○ ↻300k · 1✗ 9k/);
+});
+
+test('renderPanel keeps every line one width with cache misses at the minimum wide width', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000, misses: 12, miss_recache_tokens: 1_284_396 }, NOW);
+  for (const width of [112, 154]) {
+    const lines = panelLines(createFrame(ctx, width, NOW));
+    assert.equal(new Set(lines.map(cellWidth)).size, 1, `width ${width}`);
+  }
+});
+
+// --- API time ---
+
+const modelLine = (apiMs, now) => {
+  const ctx = makeCtx({}, now);
+  if (apiMs !== undefined) ctx.stdin.cost.total_api_duration_ms = apiMs;
+  return panelLines(createFrame(ctx, 154, now)).find((l) => stripAnsi(l).includes('Opus 5.5'));
+};
+
+test('renderPanel appends the API time to the model row, dim', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = modelLine(446_705, NOW);
+  assert.match(stripAnsi(line), /Opus 5\.5 · 1M · API 7m/);
+  assert.ok(line.includes(`\x1b[${DIM}m · API 7m`), stripAnsi(line));
+});
+
+test('renderPanel shows no API time under a minute, when missing, or when not a number', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const apiMs of [30_000, 59_999, undefined, '446705', null, NaN]) {
+    assert.doesNotMatch(stripAnsi(modelLine(apiMs, NOW)), /API/, String(apiMs));
+  }
+});

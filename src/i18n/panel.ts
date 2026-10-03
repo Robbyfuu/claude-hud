@@ -23,6 +23,7 @@ export type PanelMessageKey =
   | "panel.col.time"
   | "panel.agentsRunning"
   | "panel.agentsDone"
+  | "panel.agentShare"
   | "panel.agentsRunningOne"
   | "panel.agentsDoneOne"
   | "panel.moreAgents"
@@ -62,6 +63,7 @@ export const panelEn: Record<PanelMessageKey, string> = {
   "panel.col.time": "TIME",
   "panel.agentsRunning": "{count} running",
   "panel.agentsDone": "{count} done",
+  "panel.agentShare": "{percent}% tokens by agents",
   "panel.agentsRunningOne": "{count} running",
   "panel.agentsDoneOne": "{count} done",
   "panel.moreAgents": "+{count} more",
@@ -102,6 +104,7 @@ export const panelEs: Record<PanelMessageKey, string> = {
   "panel.col.time": "TIEMPO",
   "panel.agentsRunning": "{count} activos",
   "panel.agentsDone": "{count} listos",
+  "panel.agentShare": "{percent}% tokens de agentes",
   "panel.agentsRunningOne": "{count} activo",
   "panel.agentsDoneOne": "{count} listo",
   "panel.moreAgents": "+{count} más",
@@ -142,6 +145,7 @@ export const panelZhHans: Record<PanelMessageKey, string> = {
   "panel.col.time": "时间",
   "panel.agentsRunning": "{count} 运行中",
   "panel.agentsDone": "{count} 已完成",
+  "panel.agentShare": "代理占 {percent}% 令牌",
   "panel.agentsRunningOne": "{count} 运行中",
   "panel.agentsDoneOne": "{count} 已完成",
   "panel.moreAgents": "另有 {count} 个",
@@ -182,6 +186,7 @@ export const panelZhHant: Record<PanelMessageKey, string> = {
   "panel.col.time": "時間",
   "panel.agentsRunning": "{count} 執行中",
   "panel.agentsDone": "{count} 已完成",
+  "panel.agentShare": "代理佔 {percent}% 權杖",
   "panel.agentsRunningOne": "{count} 執行中",
   "panel.agentsDoneOne": "{count} 已完成",
   "panel.moreAgents": "另有 {count} 個",

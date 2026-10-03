@@ -242,6 +242,9 @@ Set `"lineLayout": "panel"` for a boxed dashboard sized to the terminal width:
 
 The session box's last row adds the session's token total after the cost, including every subagent transcript, with the share read from cache: `139M tok (94% cache)`.
 When starting fresh would help, a fifth row shows one hint, highest priority first: `↻ new session · context 87%` (context at or above `display.contextCriticalThreshold`), `↻ new session · cold cache, rewrites 659k` (prompt cache cold with at least 200k context tokens), or `↻ new session soon · context 72%` (context at or above `display.contextWarningThreshold`).
+The activity header appends the share of tokens spent by subagents when both they and the main session have tokens: `2 running · 1 done · 75% tokens by agents`. In a narrow panel the share is dropped first, so the tools row keeps showing its top tool.
+The environment box's cache row appends `3✗ 284k` when Claude Code reports prompt-cache misses and the tokens they rewrote (amber from 200k tokens).
+The session box's model row appends `API 7m`, the time spent waiting on the model API, once it reaches one minute.
 The panel honours `display.usagePace`, marking a 5-hour or weekly window on pace to run out with `▲` (`60%▲`, amber or red), and `display.showSessionName`, which adds the session name to the session box title (`session · auth-fix`).
 The cache row shows the time until a warm cache expires (`cache 92% ● 47m`, amber in the last two minutes) and, when the cache is cold, the context tokens the next request would rewrite (`cache 40% ○ ↻300k`, amber from 200k).
 A running subagent with no pending tool and no transcript activity for 5 minutes shows `idle 7m` in amber in its NOW cell instead of `thinking…`; a pending tool call never counts as idle.

@@ -299,6 +299,10 @@ function sessionRows(f: Frame): Line[] {
   const modelRow: Line = [s(stripContextSuffix(rawName) || rawName, PALETTE.bright, true)];
   if (windowLabel) modelRow.push(s(` · ${windowLabel}`, PALETTE.dim));
   if (effort) modelRow.push(s(` · ${clean(effort)}`, PALETTE.dim));
+  const apiMs = stdin.cost?.total_api_duration_ms;
+  if (typeof apiMs === 'number' && Number.isFinite(apiMs) && apiMs >= 60_000) {
+    modelRow.push(s(` · API ${formatDuration(apiMs).replace(/ \d+s$/, '')}`, PALETTE.dim));
+  }
 
   const projectRow: Line = [s(projectLabel(f) || '—', PALETTE.bright)];
   const addedDirs = stdin.workspace?.added_dirs?.length ?? 0;
@@ -493,6 +497,13 @@ function environmentRows(f: Frame, innerWidth: number): Line[] {
         const countdown = relativeReset(new Date(f.now + remaining), f.now);
         cacheRow.push(s(` ${countdown}`, remaining <= CACHE_EXPIRY_WARN_MS ? PALETTE.amber : PALETTE.dim));
       }
+    }
+    // misses / miss_recache_tokens are not in StdinData; read them through a narrow local type.
+    const { misses, miss_recache_tokens: recached } = cache as { misses?: unknown; miss_recache_tokens?: unknown };
+    if (typeof misses === 'number' && Number.isInteger(misses) && misses > 0) {
+      const hasTokens = typeof recached === 'number' && Number.isFinite(recached) && recached > 0;
+      const color = hasTokens && recached >= COLD_CACHE_REWRITE_MIN_TOKENS ? PALETTE.amber : PALETTE.dim;
+      cacheRow.push(s(` · ${misses}✗${hasTokens ? ` ${formatCount(recached)}` : ''}`, color));
     }
     rows.push(cacheRow);
   } else {
@@ -717,32 +728,47 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
   const runningCount = agents.filter((a) => a.status === 'running').length;
   const doneCount = agents.length - runningCount;
 
+  const counts = Object.entries(f.transcript.toolCounts ?? {})
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const toolsLabel = label('panel.tools');
+  const left: Line = [s(toolsLabel, PALETTE.dim), sp(2)];
+  const shortCounts = new Map<string, number>();
+  for (const [name] of counts) shortCounts.set(shortToolName(name), (shortCounts.get(shortToolName(name)) ?? 0) + 1);
+  // Colliding short names fall back to server:tool so they stay distinguishable.
+  const toolLabel = (name: string): string => {
+    const mcp = MCP_TOOL.exec(name);
+    const collides = (shortCounts.get(shortToolName(name)) ?? 0) > 1;
+    return clean(mcp && collides ? `${mcp[1]}:${mcp[2]}` : shortToolName(name));
+  };
+
   const right: Line = [];
   if (agents.length > 0) {
     const runningKey: MessageKey = runningCount === 1 ? 'panel.agentsRunningOne' : 'panel.agentsRunning';
     const doneKey: MessageKey = doneCount === 1 ? 'panel.agentsDoneOne' : 'panel.agentsDone';
     right.push(s(interpolate(label(runningKey), { count: runningCount }), runningCount > 0 ? PALETTE.bright : PALETTE.dim));
     right.push(s(` · ${interpolate(label(doneKey), { count: doneCount })}`, PALETTE.dim));
+    const sum = (t: Frame['subagentTokens']) => (t ? t.inputTokens + t.outputTokens + t.cacheCreationTokens + t.cacheReadTokens : 0);
+    const main = sum(f.transcript.sessionTokens);
+    const sub = sum(f.subagentTokens);
+    if (main > 0 && sub > 0) {
+      const percent = Math.round((100 * sub) / (main + sub));
+      const share = s(` · ${interpolate(label('panel.agentShare'), { percent })}`, PALETTE.dim);
+      // The share is the first thing to go: keep it only while the tools row still shows its top tool.
+      const top = counts[0];
+      const topWidth = top
+        ? textWidth(toolLabel(top[0])) + 1 + String(top[1]).length + (counts.length > 1 ? textWidth(`  +${counts.length - 1}`) : 0)
+        : textWidth(label('panel.noActivity'));
+      if (innerWidth - lineWidth(right) - lineWidth([share]) - 2 - lineWidth(left) >= topWidth) right.push(share);
+    }
   }
-
-  const counts = Object.entries(f.transcript.toolCounts ?? {})
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const toolsLabel = label('panel.tools');
   const leftBudget = innerWidth - lineWidth(right) - (right.length > 0 ? 2 : 0);
-  const left: Line = [s(toolsLabel, PALETTE.dim), sp(2)];
-  const shortCounts = new Map<string, number>();
-  for (const [name] of counts) shortCounts.set(shortToolName(name), (shortCounts.get(shortToolName(name)) ?? 0) + 1);
   if (counts.length === 0) {
     left.push(s(label('panel.noActivity'), PALETTE.dim));
   } else {
     let used = lineWidth(left);
     for (let i = 0; i < counts.length; i++) {
       const [name, count] = counts[i];
-      // Colliding short names fall back to server:tool so they stay distinguishable.
-      const collides = (shortCounts.get(shortToolName(name)) ?? 0) > 1;
-      const mcp = MCP_TOOL.exec(name);
-      const shortName = mcp && collides ? `${mcp[1]}:${mcp[2]}` : shortToolName(name);
-      const item: Line = [s(clean(shortName), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
+      const item: Line = [s(toolLabel(name), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
       const remaining = counts.length - i - 1;
       const moreWidth = remaining > 0 ? textWidth(`  +${remaining}`) : 0;
       const itemWidth = lineWidth(item) + (i > 0 ? 2 : 0);
