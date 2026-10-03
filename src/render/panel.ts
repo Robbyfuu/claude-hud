@@ -57,6 +57,8 @@ const WIDE_MIN = 112;
 const MEDIUM_MIN = 76;
 // A cold prompt cache rewrites the whole context; worth a new session past this size.
 const COLD_CACHE_REWRITE_MIN_TOKENS = 200_000;
+// The cache-row countdown turns amber this close to expiry.
+const CACHE_EXPIRY_WARN_MS = 120_000;
 
 // ---------------------------------------------------------------------------
 // Styled text
@@ -443,13 +445,23 @@ function environmentRows(f: Frame, innerWidth: number): Line[] {
 
   const cache = f.stdin.prompt_cache;
   if (cache && typeof cache.hit_ratio === 'number') {
-    rows.push([
+    const cacheRow: Line = [
       s(label('panel.cache'), PALETTE.dim),
       sp(1),
       s(`${Math.round(cache.hit_ratio * 100)}%`, PALETTE.bright, true),
       sp(1),
       cache.warm ? s('●', PALETTE.green) : s('○', PALETTE.dim),
-    ]);
+    ];
+    if (cache.warm === false) {
+      // What the next request would write back into the cache (same source as adviceRow).
+      const { tokens } = contextLevel(f);
+      if (tokens > 0) cacheRow.push(s(` ↻${formatCount(tokens)}`, tokens >= COLD_CACHE_REWRITE_MIN_TOKENS ? PALETTE.amber : PALETTE.dim));
+    } else if (typeof cache.expires_at === 'number' && Number.isFinite(cache.expires_at)) {
+      const expiresAt = cache.expires_at * 1000;
+      const countdown = relativeReset(new Date(expiresAt), f.now);
+      if (countdown) cacheRow.push(s(` ${countdown}`, expiresAt - f.now <= CACHE_EXPIRY_WARN_MS ? PALETTE.amber : PALETTE.dim));
+    }
+    rows.push(cacheRow);
   } else {
     rows.push([]);
   }

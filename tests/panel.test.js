@@ -378,6 +378,90 @@ test('renderPanel keeps the plain session title without the option or a usable n
   }
 });
 
+const cacheCtx = (promptCache, now, inputTokens) => {
+  const ctx = makeCtx({}, now);
+  ctx.stdin.prompt_cache = promptCache;
+  if (inputTokens !== undefined) ctx.stdin.context_window.current_usage = { input_tokens: inputTokens };
+  return ctx;
+};
+const cacheLine = (ctx, now, columns = 154) =>
+  panelLines(createFrame(ctx, columns, now)).find((l) => stripAnsi(l).includes('│ cache '));
+
+test('renderPanel shows a warm cache countdown to expiry, dim while time remains', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000 }, NOW), NOW);
+  assert.match(stripAnsi(line), /│ cache 92% ● 47m +│$/);
+  assert.ok(line.includes(`\x1b[${DIM}m 47m`), stripAnsi(line));
+});
+
+test('renderPanel paints the cache countdown amber with at most 120 s left', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const secs of [90, 120]) {
+    const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: NOW / 1000 + secs }, NOW), NOW);
+    assert.ok(line.includes(`\x1b[${AMBER}m 2m`), `${secs}s: ${stripAnsi(line)}`);
+  }
+  const later = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: NOW / 1000 + 121 }, NOW), NOW);
+  assert.ok(later.includes(`\x1b[${DIM}m 3m`), stripAnsi(later));
+});
+
+test('renderPanel shows no cache countdown when expires_at is past, missing or not finite', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // JSON.parse('1e400') is Infinity.
+  for (const expires_at of [NOW / 1000 - 60, NOW / 1000, undefined, null, JSON.parse('1e400')]) {
+    const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at }, NOW), NOW));
+    assert.match(line, /│ cache 92% ● +│$/, String(expires_at));
+  }
+});
+
+test('renderPanel shows the tokens a cold cache would rewrite, amber from 200k', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // A cold cache shows no countdown even with a future expires_at.
+  const line = cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4, expires_at: NOW / 1000 + 600 }, NOW, 300_000), NOW);
+  assert.match(stripAnsi(line), /│ cache 40% ○ ↻300k +│$/);
+  assert.ok(line.includes(`\x1b[${AMBER}m ↻300k`), stripAnsi(line));
+});
+
+test('renderPanel dims the cold cache rewrite below 200k tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4 }, NOW, 50_000), NOW);
+  assert.ok(line.includes(`\x1b[${DIM}m ↻50k`), stripAnsi(line));
+});
+
+test('renderPanel adds nothing to a cold cache row without context tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4 }, NOW, 0), NOW));
+  assert.match(line, /│ cache 40% ○ +│$/);
+});
+
+test('renderPanel fits the cache row at the narrowest wide layout', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const warm = cacheCtx({ warm: true, hit_ratio: 1, expires_at: NOW / 1000 + 119 * 60 }, NOW);
+  const cold = cacheCtx({ warm: false, hit_ratio: 1 }, NOW, 1_234_567);
+  for (const [ctx, row] of [[warm, /│ cache 100% ● 1h 59m +│$/], [cold, /│ cache 100% ○ ↻1\.2M +│$/]]) {
+    const lines = panelLines(createFrame(ctx, 116, NOW));
+    assert.deepEqual([...new Set(lines.map(visibleWidth))], [112]);
+    assert.match(stripAnsi(lines.find((l) => stripAnsi(l).includes('│ cache '))), row);
+  }
+});
+
+test('renderPanel keeps the inline environment line free of cache details', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = cacheCtx({ warm: false, hit_ratio: 0.4, expires_at: NOW / 1000 + 600 }, NOW, 300_000);
+  for (const columns of [100, 64]) {
+    const plain = panelLines(createFrame(ctx, columns, NOW)).map(stripAnsi);
+    const env = plain.find((l) => l.includes('environment  '));
+    assert.match(env, /│ environment {2}2 CLAUDE\.md · 1 rules · 9 MCP · 17 hooks +│$/, `columns ${columns}`);
+  }
+});
+
 test('renderPanel uses Nerd Font icons only when enabled', () => {
   const NOW = Date.now();
   const nerd = makeCtx({ config: mergeConfig({ lineLayout: 'panel', panel: { icons: 'nerd' } }) }, NOW);
