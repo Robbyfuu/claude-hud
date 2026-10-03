@@ -157,7 +157,11 @@ function formatDuration(ms: number): string {
 
 export function formatCount(n: number): string {
   // Pick the unit from the rounded value so a boundary never prints 1000k or 1000M.
-  const scaled = (value: number): string => (value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, ''));
+  // Round tenths numerically: toFixed(1) rounds 9.95 down to 9.9 because 9.95 is stored just below it.
+  const scaled = (value: number): string => {
+    const tenths = Math.round(value * 10) / 10;
+    return tenths >= 10 ? String(Math.round(value)) : String(tenths);
+  };
   if (n >= 1_000_000) {
     const millions = scaled(n / 1_000_000);
     if (Number(millions) < 1000) return `${millions}M`;

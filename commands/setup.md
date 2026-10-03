@@ -127,9 +127,9 @@ mkdir -p ~/.cache/tmp && TMPDIR=~/.cache/tmp claude /plugin install claude-hud
    The grep pattern uses `[[:space:]]` rather than `\t` to match the tab
    separator emitted by awk. GNU grep (BRE/ERE) does **not** interpret
    `\t` as a tab character — it emits `warning: stray \ before t` and
-   treats the pattern as literal `t`, so the regex never matches the awk
-   output and `plugin_dir` resolves to an empty string. The command then
-   exits without output and no HUD appears.
+   treats the pattern as literal `t`. With `\t` the regex would never match
+   the awk output, `plugin_dir` would resolve to an empty string, and the
+   command would exit without output, so no HUD would appear.
    Setup verification can hide this because some shells alias `grep` to
    alternatives (e.g. `ugrep`) that *do* expand `\t`, while the actual
    `statusLine` subprocess invokes `/usr/bin/grep`. `[[:space:]]` is a

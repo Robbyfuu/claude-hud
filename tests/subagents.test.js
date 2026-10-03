@@ -468,6 +468,23 @@ test('readSubagentTokenTotals does not cache a non-empty transcript that parsed 
   });
 });
 
+test('readSubagentTokenTotals re-parses a cached all-zero entry for a non-empty transcript', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    const file = path.join(subagentsDir, 'agent-a.jsonl');
+    await writeJsonl(file, [usageLine('msg_a1', 10, 20, 30, 40)]);
+    await readSubagentTokenTotals(transcriptPath);
+    // An older build cached a failed read as zero tokens under the file's current size and mtime.
+    const cacheFile = tokenCachePath(subagentsDir);
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    cache.files['agent-a.jsonl'].tokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+    fs.writeFileSync(cacheFile, JSON.stringify(cache));
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
+  });
+});
+
 async function cacheKeyScenario(mutate) {
   return withTempDir(async (dir) => {
     const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
