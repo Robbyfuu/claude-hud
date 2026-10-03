@@ -838,3 +838,56 @@ test('renderPanel keeps every line one width with the agent share', () => {
     assert.equal(new Set(lines.map(cellWidth)).size, 1, `width ${width}`);
   }
 });
+
+// --- prompt-cache misses ---
+
+test('renderPanel appends prompt-cache misses and rewritten tokens, amber from 200k', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000, misses: 3, miss_recache_tokens: 284_396 }, NOW), NOW);
+  assert.match(stripAnsi(line), /cache 92% ● 47m · 3✗ 284k +│$/);
+  assert.ok(line.includes(`\x1b[${AMBER}m · 3✗ 284k`), stripAnsi(line));
+});
+
+test('renderPanel dims prompt-cache misses below 200k rewritten tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, misses: 2, miss_recache_tokens: 50_000 }, NOW), NOW);
+  assert.ok(line.includes(`\x1b[${DIM}m · 2✗ 50k`), stripAnsi(line));
+});
+
+test('renderPanel omits the miss token part when miss_recache_tokens is not a positive number', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const miss_recache_tokens of [undefined, 0, '5', null]) {
+    const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, misses: 2, miss_recache_tokens }, NOW), NOW));
+    assert.match(line, /cache 92% ● · 2✗ +│$/, String(miss_recache_tokens));
+    assert.doesNotMatch(line, /2✗ \S/);
+  }
+});
+
+test('renderPanel shows no cache misses for zero, negative, fractional or non-number counts', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const misses of [0, -1, 1.5, '3', null, undefined, JSON.parse('1e400')]) {
+    const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, misses, miss_recache_tokens: 284_396 }, NOW), NOW));
+    assert.doesNotMatch(line, /✗/, String(misses));
+  }
+});
+
+test('renderPanel shows cache misses after the cold rewrite segment', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4, misses: 1, miss_recache_tokens: 9_000 }, NOW, 300_000), NOW));
+  assert.match(line, /cache 40% ○ ↻300k · 1✗ 9k/);
+});
+
+test('renderPanel keeps every line one width with cache misses at the minimum wide width', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000, misses: 12, miss_recache_tokens: 1_284_396 }, NOW);
+  for (const width of [112, 154]) {
+    const lines = panelLines(createFrame(ctx, width, NOW));
+    assert.equal(new Set(lines.map(cellWidth)).size, 1, `width ${width}`);
+  }
+});

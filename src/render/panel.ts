@@ -494,6 +494,13 @@ function environmentRows(f: Frame, innerWidth: number): Line[] {
         cacheRow.push(s(` ${countdown}`, remaining <= CACHE_EXPIRY_WARN_MS ? PALETTE.amber : PALETTE.dim));
       }
     }
+    // misses / miss_recache_tokens are not in StdinData; read them through a narrow local type.
+    const { misses, miss_recache_tokens: recached } = cache as { misses?: unknown; miss_recache_tokens?: unknown };
+    if (typeof misses === 'number' && Number.isInteger(misses) && misses > 0) {
+      const hasTokens = typeof recached === 'number' && Number.isFinite(recached) && recached > 0;
+      const color = hasTokens && recached >= COLD_CACHE_REWRITE_MIN_TOKENS ? PALETTE.amber : PALETTE.dim;
+      cacheRow.push(s(` · ${misses}✗${hasTokens ? ` ${formatCount(recached)}` : ''}`, color));
+    }
     rows.push(cacheRow);
   } else {
     rows.push([]);
