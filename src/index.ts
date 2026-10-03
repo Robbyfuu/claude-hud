@@ -3,6 +3,7 @@ import { getUsageFromStdin, isContextUnreported, readStdin } from "./stdin.js";
 import { parseTranscript } from "./transcript.js";
 import { readSubagentDetails, readSubagentTokenTotals } from "./subagents.js";
 import { selectPanelAgents } from "./panel-agents.js";
+import { readOtherSessions } from "./other-sessions.js";
 import { render } from "./render/index.js";
 import { countConfigs, type ConfigCounts } from "./config-reader.js";
 import { getGitStatus, type GitRepoIdentity, type GitStatus } from "./git.js";
@@ -79,6 +80,7 @@ export async function main(): Promise<void> {
       isPanel ? readSubagentTokenTotals(stdin.transcript_path ?? "") : null,
     ]);
     const panelAgents = isPanel ? selectPanelAgents(transcript.agents, config, now) : undefined;
+    const otherSessions = isPanel ? readOtherSessions(stdin.transcript_path ?? "", now) : undefined;
     const subagents = panelAgents ? readSubagentDetails(stdin.transcript_path ?? "", panelAgents.shown, stdin.cwd) : undefined;
 
     const stdinUsage = getUsageFromStdin(stdin);
@@ -104,6 +106,7 @@ export async function main(): Promise<void> {
       subagents,
       subagentTokens,
       panelAgents,
+      otherSessions,
     });
   } catch (error) {
     console.log("[claude-hud] Error:", error instanceof Error ? error.message : "Unknown error");
