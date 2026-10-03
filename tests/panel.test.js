@@ -838,6 +838,17 @@ test('renderPanel drops the agent share before it hides every tool name', () => 
   }
 });
 
+test('renderPanel budgets the colliding server:tool name before keeping the agent share', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = shareCtx(tokensOf(100), tokensOf(300), NOW);
+  ctx.transcript.toolCounts = { mcp__verylongserver__same: 3, mcp__b__same: 2 };
+  for (const columns of [70, 82, 100, 154]) {
+    const line = runningLine(ctx, NOW, columns);
+    assert.match(line, /verylongserver:same 3/, `${columns}: ${line}`);
+  }
+});
+
 test('renderPanel speaks Spanish in the agent share', () => {
   setLanguage('es');
   try {

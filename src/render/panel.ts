@@ -734,6 +734,12 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
   const left: Line = [s(toolsLabel, PALETTE.dim), sp(2)];
   const shortCounts = new Map<string, number>();
   for (const [name] of counts) shortCounts.set(shortToolName(name), (shortCounts.get(shortToolName(name)) ?? 0) + 1);
+  // Colliding short names fall back to server:tool so they stay distinguishable.
+  const toolLabel = (name: string): string => {
+    const mcp = MCP_TOOL.exec(name);
+    const collides = (shortCounts.get(shortToolName(name)) ?? 0) > 1;
+    return clean(mcp && collides ? `${mcp[1]}:${mcp[2]}` : shortToolName(name));
+  };
 
   const right: Line = [];
   if (agents.length > 0) {
@@ -750,7 +756,7 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
       // The share is the first thing to go: keep it only while the tools row still shows its top tool.
       const top = counts[0];
       const topWidth = top
-        ? textWidth(shortToolName(top[0])) + 1 + String(top[1]).length + (counts.length > 1 ? textWidth(`  +${counts.length - 1}`) : 0)
+        ? textWidth(toolLabel(top[0])) + 1 + String(top[1]).length + (counts.length > 1 ? textWidth(`  +${counts.length - 1}`) : 0)
         : textWidth(label('panel.noActivity'));
       if (innerWidth - lineWidth(right) - lineWidth([share]) - 2 - lineWidth(left) >= topWidth) right.push(share);
     }
@@ -762,11 +768,7 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
     let used = lineWidth(left);
     for (let i = 0; i < counts.length; i++) {
       const [name, count] = counts[i];
-      // Colliding short names fall back to server:tool so they stay distinguishable.
-      const collides = (shortCounts.get(shortToolName(name)) ?? 0) > 1;
-      const mcp = MCP_TOOL.exec(name);
-      const shortName = mcp && collides ? `${mcp[1]}:${mcp[2]}` : shortToolName(name);
-      const item: Line = [s(clean(shortName), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
+      const item: Line = [s(toolLabel(name), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
       const remaining = counts.length - i - 1;
       const moreWidth = remaining > 0 ? textWidth(`  +${remaining}`) : 0;
       const itemWidth = lineWidth(item) + (i > 0 ? 2 : 0);
