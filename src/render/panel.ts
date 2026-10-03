@@ -59,6 +59,9 @@ const MEDIUM_MIN = 76;
 const COLD_CACHE_REWRITE_MIN_TOKENS = 200_000;
 // The cache-row countdown turns amber this close to expiry.
 const CACHE_EXPIRY_WARN_MS = 120_000;
+// A prompt cache lives minutes to an hour; an expiry further out is bad data
+// (such as milliseconds sent as seconds), so the row shows no countdown.
+const CACHE_EXPIRY_MAX_MS = 24 * 3_600_000;
 
 // ---------------------------------------------------------------------------
 // Styled text
@@ -456,10 +459,12 @@ function environmentRows(f: Frame, innerWidth: number): Line[] {
       // What the next request would write back into the cache (same source as adviceRow).
       const { tokens } = contextLevel(f);
       if (tokens > 0) cacheRow.push(s(` ↻${formatCount(tokens)}`, tokens >= COLD_CACHE_REWRITE_MIN_TOKENS ? PALETTE.amber : PALETTE.dim));
-    } else if (typeof cache.expires_at === 'number' && Number.isFinite(cache.expires_at)) {
-      const expiresAt = cache.expires_at * 1000;
-      const countdown = relativeReset(new Date(expiresAt), f.now);
-      if (countdown) cacheRow.push(s(` ${countdown}`, expiresAt - f.now <= CACHE_EXPIRY_WARN_MS ? PALETTE.amber : PALETTE.dim));
+    } else if (cache.warm === true && typeof cache.expires_at === 'number') {
+      const remaining = cache.expires_at * 1000 - f.now;
+      if (Number.isFinite(remaining) && remaining > 0 && remaining <= CACHE_EXPIRY_MAX_MS) {
+        const countdown = relativeReset(new Date(f.now + remaining), f.now);
+        cacheRow.push(s(` ${countdown}`, remaining <= CACHE_EXPIRY_WARN_MS ? PALETTE.amber : PALETTE.dim));
+      }
     }
     rows.push(cacheRow);
   } else {

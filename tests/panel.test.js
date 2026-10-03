@@ -4,6 +4,7 @@ import { panelLines } from '../src/render/panel.js';
 import { createFrame } from '../src/render/frame.js';
 import { mergeConfig } from '../src/config.js';
 import { setLanguage } from '../src/i18n/index.js';
+import { textWidth } from '../src/render/ansi.js';
 
 function stripAnsi(str) {
   // eslint-disable-next-line no-control-regex
@@ -13,6 +14,9 @@ function stripAnsi(str) {
 function visibleWidth(str) {
   return Array.from(stripAnsi(str)).length;
 }
+
+// Terminal cells, so wide CJK and emoji count double.
+const cellWidth = (str) => textWidth(stripAnsi(str));
 
 function makeCtx(overrides = {}, now = Date.now()) {
   return {
@@ -347,9 +351,20 @@ test('renderPanel truncates a long session name and keeps every line at the pane
   const name = 'refactor-the-authentication-flow-and-token-refresh-'.repeat(4);
   for (const columns of [154, 100, 64]) {
     const lines = panelLines(createFrame(namedCtx(name, NOW), columns, NOW));
-    const widths = new Set(lines.map(visibleWidth));
+    const widths = new Set(lines.map(cellWidth));
     assert.deepEqual([...widths], [columns - 4], `columns ${columns}`);
     assert.match(stripAnsi(lines[0]), /^╭─ session · refactor-the-[^╮]*… ─╮/, `columns ${columns}`);
+  }
+});
+
+test('renderPanel keeps every line at the panel width with a wide CJK and emoji session name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const name = '日本語のセッション名🚀'.repeat(3);
+  for (const columns of [100, 64]) {
+    const lines = panelLines(createFrame(namedCtx(name, NOW), columns, NOW));
+    assert.deepEqual([...new Set(lines.map(cellWidth))], [columns - 4], `columns ${columns}`);
+    assert.match(stripAnsi(lines[0]), /^╭─ session · 日本語/, `columns ${columns}`);
   }
 });
 
@@ -357,7 +372,7 @@ test('renderPanel sanitizes control and ANSI characters in the session name', ()
   setLanguage('en');
   const NOW = Date.now();
   const lines = panelLines(createFrame(namedCtx('\x1b[31mauth\x07-fix‮\x1b]8;;http://x\x07', NOW), 154, NOW));
-  assert.equal(new Set(lines.map(visibleWidth)).size, 1);
+  assert.equal(new Set(lines.map(cellWidth)).size, 1);
   assert.match(stripAnsi(lines[0]), /^╭─ session · auth-fix ─+╮ /);
   assert.ok(!lines[0].includes('\x1b[31m') && !lines[0].includes('\x07') && !lines[0].includes('‮'));
 });
@@ -414,6 +429,28 @@ test('renderPanel shows no cache countdown when expires_at is past, missing or n
     const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at }, NOW), NOW));
     assert.match(line, /│ cache 92% ● +│$/, String(expires_at));
   }
+});
+
+test('renderPanel shows no cache countdown for a finite but huge expires_at', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: 1e300 }, NOW), NOW));
+  assert.ok(!line.includes('NaN'), line);
+  assert.match(line, /│ cache 92% ● +│$/);
+});
+
+test('renderPanel shows no cache countdown for an expires_at given in milliseconds', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: NOW + 47 * 60_000 }, NOW), NOW));
+  assert.match(line, /│ cache 92% ● +│$/);
+});
+
+test('renderPanel shows no cache countdown when warm is missing', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000 }, NOW), NOW));
+  assert.match(line, /│ cache 92% ○ +│$/);
 });
 
 test('renderPanel shows the tokens a cold cache would rewrite, amber from 200k', () => {
