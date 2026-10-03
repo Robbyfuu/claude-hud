@@ -645,3 +645,38 @@ test('renderPanel keeps the idle cell inside narrow layouts', () => {
     assert.ok(lines.some((l) => stripAnsi(l).includes('idle 7m')), `width ${width}: idle shown`);
   }
 });
+
+// --- short MCP tool names ---
+
+const toolsLine = (toolCounts, now) => {
+  const ctx = makeCtx({}, now);
+  ctx.transcript.toolCounts = toolCounts;
+  return panelLines(createFrame(ctx, 154, now)).map(stripAnsi).find((l) => l.includes('tools'));
+};
+
+test('renderPanel shortens an MCP tool name to its tool part in the tools row', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = toolsLine({ mcp__plugin_context_mode_context_mode__ctx_execute: 5, Bash: 3 }, NOW);
+  assert.match(line, /ctx_execute 5/);
+  assert.doesNotMatch(line, /plugin_context/);
+  assert.match(line, /Bash 3/);
+});
+
+test('renderPanel keeps server:tool for MCP tools whose short names collide', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = toolsLine({ mcp__a__search: 4, mcp__b__search: 2, mcp__c__fetch: 1 }, NOW);
+  assert.match(line, /a:search 4/);
+  assert.match(line, /b:search 2/);
+  assert.match(line, /fetch 1/);
+  assert.doesNotMatch(line, /c:fetch/);
+});
+
+test('renderPanel shows the short MCP tool name in the NOW cell', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(agentLine(stallCtx({ currentTool: { name: 'mcp__x__do_thing', target: 'now' } }, NOW), NOW));
+  assert.match(line, /do_thing now/);
+  assert.doesNotMatch(line, /mcp__|x:do_thing/);
+});

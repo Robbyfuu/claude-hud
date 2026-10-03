@@ -185,6 +185,11 @@ function quotaColor(percent: number, base: string): string {
   return base;
 }
 
+/** `mcp__<server>__<tool>` becomes `<tool>`; other names pass through. */
+function shortToolName(name: string): string {
+  return name.startsWith('mcp__') ? name.slice(name.lastIndexOf('__') + 2) || name : name;
+}
+
 function label(key: MessageKey): string {
   return t(key);
 }
@@ -561,7 +566,7 @@ function agentCells(agent: AgentEntry, detail: SubagentDetail | undefined, now: 
   if (!running) {
     nowCell = [s('—', PALETTE.dim)];
   } else if (detail?.currentTool) {
-    nowCell = [s(detail.currentTool.name, PALETTE.bright)];
+    nowCell = [s(clean(shortToolName(detail.currentTool.name)), PALETTE.bright)];
     if (detail.currentTool.target) nowCell.push(s(` ${detail.currentTool.target}`, PALETTE.dim));
   } else {
     const idleMs = detail?.lastActivityAt ? now - detail.lastActivityAt.getTime() : NaN;
@@ -705,13 +710,17 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
   const toolsLabel = label('panel.tools');
   const leftBudget = innerWidth - lineWidth(right) - (right.length > 0 ? 2 : 0);
   const left: Line = [s(toolsLabel, PALETTE.dim), sp(2)];
+  const shortCounts = new Map<string, number>();
+  for (const [name] of counts) shortCounts.set(shortToolName(name), (shortCounts.get(shortToolName(name)) ?? 0) + 1);
   if (counts.length === 0) {
     left.push(s(label('panel.noActivity'), PALETTE.dim));
   } else {
     let used = lineWidth(left);
     for (let i = 0; i < counts.length; i++) {
       const [name, count] = counts[i];
-      const shortName = name.startsWith('mcp__') ? name.split('__').slice(1).join(':') : name;
+      // Colliding short names fall back to server:tool so they stay distinguishable.
+      const collides = (shortCounts.get(shortToolName(name)) ?? 0) > 1;
+      const shortName = name.startsWith('mcp__') && collides ? name.split('__').slice(1).join(':') : shortToolName(name);
       const item: Line = [s(clean(shortName), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
       const remaining = counts.length - i - 1;
       const moreWidth = remaining > 0 ? textWidth(`  +${remaining}`) : 0;
