@@ -723,6 +723,37 @@ function agentTable(f: Frame, innerWidth: number): Line[] {
   return lines;
 }
 
+const MAX_OTHER_SESSIONS_SHOWN = 4;
+
+function otherSessionsRow(f: Frame, innerWidth: number): Line {
+  const sessions = f.otherSessions ?? [];
+  const frame = SPINNER[Math.floor(f.now / 1000) % SPINNER.length];
+  const row: Line = [s(label('panel.sessions'), PALETTE.dim), sp(2)];
+  let used = lineWidth(row);
+  const limit = Math.min(sessions.length, MAX_OTHER_SESSIONS_SHOWN);
+  for (let i = 0; i < sessions.length; i++) {
+    const entry: Line = [s(clean(sessions[i].project, '—'), PALETTE.fg)];
+    if (sessions[i].agentsActive > 0) entry.push(s(` ${frame}${sessions[i].agentsActive}`, PALETTE.amber));
+    const idleMs = f.now - sessions[i].lastWriteAt;
+    if (idleMs >= 60_000) {
+      const duration = formatDuration(idleMs).replace(/ \d+s$/, '');
+      entry.push(s(` ${interpolate(label('panel.sessionIdle'), { duration })}`, PALETTE.dim));
+    }
+    const sep = i > 0 ? [s(' · ', PALETTE.dim)] : [];
+    const moreWidth = textWidth(`  +${sessions.length - i - 1}`);
+    const fits = used + lineWidth(sep) + lineWidth(entry) + (i < sessions.length - 1 ? moreWidth : 0) <= innerWidth;
+    // The first entry always shows (truncated); later ones need room, and the cap hides the rest.
+    if (i >= limit || (i > 0 && !fits)) {
+      row.push(s(`  +${sessions.length - i}`, PALETTE.dim));
+      break;
+    }
+    const part = [...sep, ...entry];
+    row.push(...(i === 0 ? truncate(part, innerWidth - used) : part));
+    used += lineWidth(part);
+  }
+  return fit(row, innerWidth);
+}
+
 function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean): Line[] {
   const agents = f.transcript.agents ?? [];
   const runningCount = agents.filter((a) => a.status === 'running').length;
@@ -787,6 +818,7 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
     : left;
 
   const rows: Line[] = [firstLine];
+  if (f.otherSessions && f.otherSessions.length > 0) rows.push(otherSessionsRow(f, innerWidth));
   if (includeEnvironment) rows.push(environmentInline(f));
   rows.push(...agentTable(f, innerWidth));
   return rows;

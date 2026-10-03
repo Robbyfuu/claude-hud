@@ -32,6 +32,8 @@ export type PanelMessageKey =
   | "panel.done"
   | "panel.thinking"
   | "panel.idle"
+  | "panel.sessions"
+  | "panel.sessionIdle"
   | "panel.noActivity"
   | "panel.noGit"
   | "panel.compact"
@@ -72,6 +74,8 @@ export const panelEn: Record<PanelMessageKey, string> = {
   "panel.done": "done",
   "panel.thinking": "thinking…",
   "panel.idle": "idle {duration}",
+  "panel.sessions": "sessions",
+  "panel.sessionIdle": "idle {duration}",
   "panel.noActivity": "no activity yet",
   "panel.noGit": "no git",
   "panel.compact": "/compact",
@@ -113,6 +117,8 @@ export const panelEs: Record<PanelMessageKey, string> = {
   "panel.done": "listo",
   "panel.thinking": "pensando…",
   "panel.idle": "inactivo {duration}",
+  "panel.sessions": "sesiones",
+  "panel.sessionIdle": "inactiva {duration}",
   "panel.noActivity": "sin actividad aún",
   "panel.noGit": "sin git",
   "panel.compact": "/compact",
@@ -154,6 +160,8 @@ export const panelZhHans: Record<PanelMessageKey, string> = {
   "panel.done": "完成",
   "panel.thinking": "思考中…",
   "panel.idle": "空闲 {duration}",
+  "panel.sessions": "会话",
+  "panel.sessionIdle": "空闲 {duration}",
   "panel.noActivity": "暂无活动",
   "panel.noGit": "无 git",
   "panel.compact": "/compact",
@@ -195,6 +203,8 @@ export const panelZhHant: Record<PanelMessageKey, string> = {
   "panel.done": "完成",
   "panel.thinking": "思考中…",
   "panel.idle": "閒置 {duration}",
+  "panel.sessions": "工作階段",
+  "panel.sessionIdle": "閒置 {duration}",
   "panel.noActivity": "暫無活動",
   "panel.noGit": "無 git",
   "panel.compact": "/compact",

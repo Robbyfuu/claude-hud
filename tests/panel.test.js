@@ -944,3 +944,58 @@ test('renderPanel shows no API time under a minute, when missing, or when not a 
     assert.doesNotMatch(stripAnsi(modelLine(apiMs, NOW)), /API/, String(apiMs));
   }
 });
+
+// Other active sessions row. NOW is a multiple of 10 s so the spinner frame is the first one.
+const SESSIONS_NOW = 1_800_000_000_000;
+const sess = (project, agentsActive = 0, ageMs = 30_000) => ({ project, lastWriteAt: SESSIONS_NOW - ageMs, agentsActive });
+const sessionsRow = (otherSessions, { width = 154, lang = 'en' } = {}) => {
+  setLanguage(lang);
+  const lines = panelLines(createFrame(makeCtx({ otherSessions }, SESSIONS_NOW), width, SESSIONS_NOW));
+  return { lines, row: lines.find((l) => /(sessions|sesiones) {2}/.test(stripAnsi(l))) };
+};
+
+test('renderPanel lists another session with its active agent count in amber', () => {
+  const { row } = sessionsRow([sess('clay-academy', 1)]);
+  assert.ok(row, 'a sessions row');
+  assert.match(stripAnsi(row), /sessions {2}clay-academy ⠋1/);
+  assert.ok(row.includes(`\x1b[${AMBER}m ⠋1`));
+});
+
+test('renderPanel marks a session quiet for a minute or more as idle', () => {
+  const { row } = sessionsRow([sess('icloud-sync', 0, 9 * 60_000)]);
+  assert.match(stripAnsi(row), /icloud-sync idle 9m/);
+});
+
+test('renderPanel shows four sessions and counts the rest', () => {
+  const names = ['a1', 'b2', 'c3', 'd4', 'e5', 'f6'];
+  const { row } = sessionsRow(names.map((n) => sess(n)));
+  const plain = stripAnsi(row);
+  assert.match(plain, /a1 · b2 · c3 · d4 {2}\+2/);
+  assert.doesNotMatch(plain, /e5/);
+});
+
+test('renderPanel translates the sessions row to Spanish', () => {
+  const { row } = sessionsRow([sess('icloud-sync', 0, 9 * 60_000)], { lang: 'es' });
+  assert.match(stripAnsi(row), /sesiones {2}icloud-sync inactiva 9m/);
+  setLanguage('en');
+});
+
+test('renderPanel sanitizes control characters in a session project name', () => {
+  const { row } = sessionsRow([sess('bad\x1b[31mname\x07')]);
+  assert.ok(row);
+  assert.doesNotMatch(row, /\x07/);
+  assert.doesNotMatch(stripAnsi(row), /\x1b/);
+});
+
+test('renderPanel keeps the panel width with sessions and still shows the first one at width 70', () => {
+  for (const width of [70, 100, 140]) {
+    const { lines, row } = sessionsRow([sess('clay-academy', 1), sess('icloud-sync', 0, 9 * 60_000), sess('nestjs-stripe-monorepo', 1)], { width });
+    assert.equal(new Set(lines.map(cellWidth)).size, 1, `one width at ${width}`);
+    assert.match(stripAnsi(row), /clay-academy/, `first entry at ${width}`);
+  }
+});
+
+test('renderPanel has no sessions row without other sessions', () => {
+  assert.equal(sessionsRow(undefined).row, undefined);
+  assert.equal(sessionsRow([]).row, undefined);
+});

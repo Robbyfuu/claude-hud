@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, copyFile, readFile, readdir, rm, realpath } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, copyFile, readFile, readdir, rm, realpath, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -239,4 +239,33 @@ test('panel counts CLAUDE.md, rules, MCP servers and hooks without display.showC
   const plain = raw.replace(/\x1b\[[0-9;]*m/g, '');
   assert.match(plain, /CLAUDE\.md +1  rules +1 /);
   assert.match(plain, /MCP +1  hooks +1 /);
+});
+
+test('panel lists other active sessions from the config dir', async () => {
+  const { raw } = await runCase({
+    name: 'other-sessions-wiring',
+    stdin: {
+      session_id: 'golden-session',
+      transcript_path: '<TRANSCRIPT>',
+      cwd: '<PROJECT>',
+      model: { id: 'claude-opus-5-5', display_name: 'Opus 5.5' },
+      context_window: { context_window_size: 200_000, used_percentage: 10, current_usage: { input_tokens: 20_000 } },
+    },
+    config: { lineLayout: 'panel' },
+    columns: 100,
+    async setup({ configDir }) {
+      const dir = path.join(configDir, 'projects', 'other');
+      const file = path.join(dir, 'other-session.jsonl');
+      await mkdir(dir, { recursive: true });
+      await writeFile(file, jsonl({ type: 'user', cwd: '/x/other-proj' }));
+      // The harness freezes Date.now() to NOW_MS, so set the mtime explicitly.
+      const at = new Date(NOW_MS - 3 * 60_000);
+      await utimes(file, at, at);
+    },
+  });
+  // eslint-disable-next-line no-control-regex
+  const plain = raw.replace(/\x1b\[[0-9;]*m/g, '').trimEnd();
+  assert.match(plain, /other-proj/);
+  const widths = new Set(plain.split('\n').map((line) => [...line].length));
+  assert.equal(widths.size, 1, `every line keeps the panel width in:\n${plain}`);
 });
