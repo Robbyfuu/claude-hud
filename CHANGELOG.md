@@ -4,8 +4,14 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- The `panel` layout honours `display.usagePace`: the 5-hour and weekly rows turn amber or red with a `▲` when on pace to run out. (Fork only.)
+- The `panel` layout honours `display.showSessionName`, adding the session name to the session box title. (Fork only.)
+- The `panel` cache row shows the time until a warm cache expires, and the context tokens a cold cache would rewrite. (Fork only.)
+
 ### Fixed
 - A folder name containing ` │ ` no longer leaves the project link open over the rest of the HUD when line 1 wraps.
+- Teammate idle notifications are scanned linearly, so a message with many unclosed `<teammate-message` openers no longer stalls the parser. (Fork only.)
 
 ## [0.10.0] - 2026-10-01
 

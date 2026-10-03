@@ -4,6 +4,7 @@ import { panelLines } from '../src/render/panel.js';
 import { createFrame } from '../src/render/frame.js';
 import { mergeConfig } from '../src/config.js';
 import { setLanguage } from '../src/i18n/index.js';
+import { textWidth } from '../src/render/ansi.js';
 
 function stripAnsi(str) {
   // eslint-disable-next-line no-control-regex
@@ -13,6 +14,9 @@ function stripAnsi(str) {
 function visibleWidth(str) {
   return Array.from(stripAnsi(str)).length;
 }
+
+// Terminal cells, so wide CJK and emoji count double.
+const cellWidth = (str) => textWidth(stripAnsi(str));
 
 function makeCtx(overrides = {}, now = Date.now()) {
   return {
@@ -127,7 +131,7 @@ test('renderPanel flags a critical context with /compact and handles missing dat
   ctx.stdin.context_window.used_percentage = 91;
   ctx.transcript.agents = [];
   ctx.transcript.toolCounts = {};
-  const plain = panelLines(createFrame(ctx, 140, NOW)).map(stripAnsi);
+  const plain = panelLines(createFrame(ctx, 200, NOW)).map(stripAnsi);
   assert.ok(plain.some((l) => l.includes('91%') && l.includes('/compact')));
   assert.ok(plain.some((l) => l.includes('no git')));
   assert.ok(plain.some((l) => l.includes('no activity yet')));
@@ -258,6 +262,265 @@ test('renderPanel shows the advice row in medium and narrow layouts', () => {
   assert.ok(medium.map(stripAnsi).some((l) => l.includes('↻ new session · context 87%')));
   const narrow = panelLines(createFrame(adviceCtx(87, true, 10, NOW), 64, NOW)).map(stripAnsi);
   assert.ok(narrow.some((l) => l.includes('↻ new session · context 87%')));
+});
+
+const RED = '38;2;255;122;150';
+const AMBER = '38;2;245;194;107';
+const DIM = '38;2;138;132;160';
+const paceCtx = (usageData, now, display = { usagePace: true }) =>
+  makeCtx({ usageData, config: mergeConfig({ lineLayout: 'panel', display }) }, now);
+const usageLine = (ctx, now, name) =>
+  panelLines(createFrame(ctx, 154, now)).find((l) => stripAnsi(l).includes(`│ ${name} `));
+
+test('renderPanel marks a critical 5h pace with ▲ in red', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = paceCtx({ fiveHour: 60, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, '5 hours');
+  assert.ok(line.includes(`\x1b[1;${RED}m60%▲`), stripAnsi(line));
+  assert.ok(line.includes(`\x1b[${RED}m▇`), 'bar painted red');
+});
+
+test('renderPanel omits the pace marker at 100% even under a critical pace', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = paceCtx({ fiveHour: 100, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const text = stripAnsi(usageLine(ctx, NOW, '5 hours'));
+  assert.ok(text.includes('100%'), text);
+  assert.ok(!text.includes('▲') && !text.includes('…'), text);
+});
+
+test('renderPanel keeps the pace marker intact in CJK mode below 100%', () => {
+  setLanguage('zh-Hans');
+  try {
+    const NOW = Date.now();
+    const ctx = paceCtx({ fiveHour: 62, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+    const lines = panelLines(createFrame(ctx, 200, NOW)).map(stripAnsi);
+    const line = lines.find((l) => l.includes('62%'));
+    // Wide enough that the row itself is not cut; `62%▲` is 5 cells with ▲ counted double, so it must still fit.
+    assert.ok(line?.includes('62%▲'), lines.join('\n'));
+    assert.ok(!line.includes('…'), line);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('renderPanel marks a warning 5h pace with ▲ in amber', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 47% after half the window projects to 94%: warning, not critical.
+  const ctx = paceCtx({ fiveHour: 47, sevenDay: 31, fiveHourResetAt: new Date(NOW + 2.5 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, '5 hours');
+  assert.ok(line.includes(`\x1b[1;${AMBER}m47%▲`), stripAnsi(line));
+  assert.ok(line.includes(`\x1b[${AMBER}m▇`), 'bar painted amber');
+});
+
+test('renderPanel never lowers a red usage band to the amber of a warning pace', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 92% with 20m left projects to ~99%: warning pace, but the band is already red.
+  const ctx = paceCtx({ fiveHour: 92, sevenDay: 31, fiveHourResetAt: new Date(NOW + 20 * 60_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, '5 hours');
+  assert.ok(line.includes(`\x1b[1;${RED}m92%▲`), stripAnsi(line));
+});
+
+test('renderPanel shows no pace marker under 10% usage', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 8% ten minutes in projects past 100%, but under 10% the projection is noise.
+  const ctx = paceCtx({ fiveHour: 8, sevenDay: 31, fiveHourResetAt: new Date(NOW + 290 * 60_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = stripAnsi(usageLine(ctx, NOW, '5 hours'));
+  assert.ok(!line.includes('▲'), line);
+  assert.match(line, / 8% ↻ 4h 50m/);
+});
+
+test('renderPanel ignores pace when display.usagePace is off', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const usage = { fiveHour: 60, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) };
+  for (const display of [{}, { usagePace: false }]) {
+    const line = usageLine(paceCtx(usage, NOW, display), NOW, '5 hours');
+    assert.ok(!stripAnsi(line).includes('▲'), stripAnsi(line));
+    // Today's row: violet bar and value from the percentage bands.
+    assert.ok(line.includes('\x1b[1;38;2;165;148;255m60%\x1b[0m'), stripAnsi(line));
+  }
+});
+
+test('renderPanel grades the weekly pace against the 7-day window', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 60% one day into the week projects to 420%. Against a 5h window the reset
+  // is more than a window away, so there would be no pace at all.
+  const ctx = paceCtx({ fiveHour: 5, sevenDay: 60, fiveHourResetAt: new Date(NOW + 2 * 3600_000), sevenDayResetAt: new Date(NOW + 6 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, 'weekly');
+  assert.ok(line.includes(`\x1b[1;${RED}m60%▲`), stripAnsi(line));
+});
+
+const namedCtx = (sessionName, now, display = { showSessionName: true }) => {
+  const ctx = makeCtx({ config: mergeConfig({ lineLayout: 'panel', display }) }, now);
+  ctx.stdin.session_name = sessionName;
+  return ctx;
+};
+
+test('renderPanel shows the session name in the session box title', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const plain = panelLines(createFrame(namedCtx('auth-fix', NOW), 154, NOW)).map(stripAnsi);
+  assert.match(plain[0], /^╭─ session · auth-fix ─+╮ ╭─ usage /);
+});
+
+test('renderPanel truncates a long session name and keeps every line at the panel width', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const name = 'refactor-the-authentication-flow-and-token-refresh-'.repeat(4);
+  for (const columns of [154, 100, 64]) {
+    const lines = panelLines(createFrame(namedCtx(name, NOW), columns, NOW));
+    const widths = new Set(lines.map(cellWidth));
+    assert.deepEqual([...widths], [columns - 4], `columns ${columns}`);
+    assert.match(stripAnsi(lines[0]), /^╭─ session · refactor-the-[^╮]*… ─╮/, `columns ${columns}`);
+  }
+});
+
+test('renderPanel keeps every line at the panel width with a wide CJK and emoji session name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const name = '日本語のセッション名🚀'.repeat(3);
+  for (const columns of [100, 64]) {
+    const lines = panelLines(createFrame(namedCtx(name, NOW), columns, NOW));
+    assert.deepEqual([...new Set(lines.map(cellWidth))], [columns - 4], `columns ${columns}`);
+    assert.match(stripAnsi(lines[0]), /^╭─ session · 日本語/, `columns ${columns}`);
+  }
+});
+
+test('renderPanel sanitizes control and ANSI characters in the session name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const lines = panelLines(createFrame(namedCtx('\x1b[31mauth\x07-fix‮\x1b]8;;http://x\x07', NOW), 154, NOW));
+  assert.equal(new Set(lines.map(cellWidth)).size, 1);
+  assert.match(stripAnsi(lines[0]), /^╭─ session · auth-fix ─+╮ /);
+  assert.ok(!lines[0].includes('\x1b[31m') && !lines[0].includes('\x07') && !lines[0].includes('‮'));
+});
+
+test('renderPanel keeps the plain session title without the option or a usable name', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const cases = [
+    namedCtx('auth-fix', NOW, {}),
+    namedCtx('auth-fix', NOW, { showSessionName: false }),
+    namedCtx(undefined, NOW),
+    namedCtx('   ', NOW),
+    namedCtx('\x1b[31m\x07', NOW),
+  ];
+  for (const ctx of cases) {
+    const first = stripAnsi(panelLines(createFrame(ctx, 154, NOW))[0]);
+    assert.match(first, /^╭─ session ─+╮ ╭─ usage /, JSON.stringify(ctx.stdin.session_name));
+  }
+});
+
+const cacheCtx = (promptCache, now, inputTokens) => {
+  const ctx = makeCtx({}, now);
+  ctx.stdin.prompt_cache = promptCache;
+  if (inputTokens !== undefined) ctx.stdin.context_window.current_usage = { input_tokens: inputTokens };
+  return ctx;
+};
+const cacheLine = (ctx, now, columns = 154) =>
+  panelLines(createFrame(ctx, columns, now)).find((l) => stripAnsi(l).includes('│ cache '));
+
+test('renderPanel shows a warm cache countdown to expiry, dim while time remains', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000 }, NOW), NOW);
+  assert.match(stripAnsi(line), /│ cache 92% ● 47m +│$/);
+  assert.ok(line.includes(`\x1b[${DIM}m 47m`), stripAnsi(line));
+});
+
+test('renderPanel paints the cache countdown amber with at most 120 s left', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const secs of [90, 120]) {
+    const line = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: NOW / 1000 + secs }, NOW), NOW);
+    assert.ok(line.includes(`\x1b[${AMBER}m 2m`), `${secs}s: ${stripAnsi(line)}`);
+  }
+  const later = cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: NOW / 1000 + 121 }, NOW), NOW);
+  assert.ok(later.includes(`\x1b[${DIM}m 3m`), stripAnsi(later));
+});
+
+test('renderPanel shows no cache countdown when expires_at is past, missing or not finite', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // JSON.parse('1e400') is Infinity.
+  for (const expires_at of [NOW / 1000 - 60, NOW / 1000, undefined, null, JSON.parse('1e400')]) {
+    const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at }, NOW), NOW));
+    assert.match(line, /│ cache 92% ● +│$/, String(expires_at));
+  }
+});
+
+test('renderPanel shows no cache countdown for a finite but huge expires_at', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: 1e300 }, NOW), NOW));
+  assert.ok(!line.includes('NaN'), line);
+  assert.match(line, /│ cache 92% ● +│$/);
+});
+
+test('renderPanel shows no cache countdown for an expires_at given in milliseconds', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: true, hit_ratio: 0.92, expires_at: NOW + 47 * 60_000 }, NOW), NOW));
+  assert.match(line, /│ cache 92% ● +│$/);
+});
+
+test('renderPanel shows no cache countdown when warm is missing', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ hit_ratio: 0.92, expires_at: (NOW + 47 * 60_000) / 1000 }, NOW), NOW));
+  assert.match(line, /│ cache 92% ○ +│$/);
+});
+
+test('renderPanel shows the tokens a cold cache would rewrite, amber from 200k', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // A cold cache shows no countdown even with a future expires_at.
+  const line = cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4, expires_at: NOW / 1000 + 600 }, NOW, 300_000), NOW);
+  assert.match(stripAnsi(line), /│ cache 40% ○ ↻300k +│$/);
+  assert.ok(line.includes(`\x1b[${AMBER}m ↻300k`), stripAnsi(line));
+});
+
+test('renderPanel dims the cold cache rewrite below 200k tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4 }, NOW, 50_000), NOW);
+  assert.ok(line.includes(`\x1b[${DIM}m ↻50k`), stripAnsi(line));
+});
+
+test('renderPanel adds nothing to a cold cache row without context tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(cacheLine(cacheCtx({ warm: false, hit_ratio: 0.4 }, NOW, 0), NOW));
+  assert.match(line, /│ cache 40% ○ +│$/);
+});
+
+test('renderPanel fits the cache row at the narrowest wide layout', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const warm = cacheCtx({ warm: true, hit_ratio: 1, expires_at: NOW / 1000 + 119 * 60 }, NOW);
+  const cold = cacheCtx({ warm: false, hit_ratio: 1 }, NOW, 1_234_567);
+  for (const [ctx, row] of [[warm, /│ cache 100% ● 1h 59m +│$/], [cold, /│ cache 100% ○ ↻1\.2M +│$/]]) {
+    const lines = panelLines(createFrame(ctx, 116, NOW));
+    assert.deepEqual([...new Set(lines.map(visibleWidth))], [112]);
+    assert.match(stripAnsi(lines.find((l) => stripAnsi(l).includes('│ cache '))), row);
+  }
+});
+
+test('renderPanel keeps the inline environment line free of cache details', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = cacheCtx({ warm: false, hit_ratio: 0.4, expires_at: NOW / 1000 + 600 }, NOW, 300_000);
+  for (const columns of [100, 64]) {
+    const plain = panelLines(createFrame(ctx, columns, NOW)).map(stripAnsi);
+    const env = plain.find((l) => l.includes('environment  '));
+    assert.match(env, /│ environment {2}2 CLAUDE\.md · 1 rules · 9 MCP · 17 hooks +│$/, `columns ${columns}`);
+  }
 });
 
 test('renderPanel uses Nerd Font icons only when enabled', () => {

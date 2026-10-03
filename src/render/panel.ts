@@ -6,6 +6,7 @@ import type { MessageKey } from '../i18n/types.js';
 import { sanitizeDisplayText } from '../utils/sanitize.js';
 import { formatSessionDuration } from '../utils/format.js';
 import { selectPanelAgents } from '../subagents.js';
+import { FIVE_HOUR_WINDOW_MS, SEVEN_DAY_WINDOW_MS, getUsagePace, isPaceAlert } from '../usage-pace.js';
 import { shortModel } from './activity.js';
 import { sliceToWidth, textWidth } from './ansi.js';
 import { RESET } from './colors.js';
@@ -56,6 +57,11 @@ const WIDE_MIN = 112;
 const MEDIUM_MIN = 76;
 // A cold prompt cache rewrites the whole context; worth a new session past this size.
 const COLD_CACHE_REWRITE_MIN_TOKENS = 200_000;
+// The cache-row countdown turns amber this close to expiry.
+const CACHE_EXPIRY_WARN_MS = 120_000;
+// A prompt cache lives minutes to an hour; an expiry further out is bad data
+// (such as milliseconds sent as seconds), so the row shows no countdown.
+const CACHE_EXPIRY_MAX_MS = 24 * 3_600_000;
 
 // ---------------------------------------------------------------------------
 // Styled text
@@ -362,23 +368,42 @@ function usageRows(f: Frame, innerWidth: number): Line[] {
 
   // Usage windows
   const usage = f.usageData;
-  const windowRow = (name: string, value: number | null | undefined, base: string, reset: string): Line => {
+  const paceOn = f.config?.display?.usagePace === true;
+  const windowRow = (
+    name: string,
+    value: number | null | undefined,
+    base: string,
+    resetAt: Date | null,
+    reset: string,
+    windowMs: number,
+  ): Line => {
     if (typeof value !== 'number') return row(name, empty(), s('—', PALETTE.dim), []);
     const pct = Math.round(Math.min(100, Math.max(0, value)));
-    const color = quotaColor(pct, base);
-    return row(name, bar(pct, barWidth, color), s(`${pct}%`, color, true), reset ? [s(`${resetGlyph} ${reset}`, PALETTE.dim)] : []);
+    const pace = paceOn ? getUsagePace(value, resetAt, windowMs, f.now) : null;
+    const band = quotaColor(pct, base);
+    // Pace only raises the band's color: red stays red under a warning pace.
+    const color = pace === 'critical' ? PALETTE.red : pace === 'warning' && band !== PALETTE.red ? PALETTE.amber : band;
+    // At 100% the window is spent, and in CJK mode `100%▲` would be truncated to an ellipsis.
+    const text = isPaceAlert(pace) && pct < 100 ? `${pct}%▲` : `${pct}%`;
+    return row(name, bar(pct, barWidth, color), s(text, color, true), reset ? [s(`${resetGlyph} ${reset}`, PALETTE.dim)] : []);
   };
+  const fiveHourReset = usage?.fiveHourResetAt ?? null;
   const fiveHourRow = windowRow(
     labels[1],
     usage?.fiveHour,
     PALETTE.violet,
-    relativeReset(usage?.fiveHourResetAt ?? null, f.now),
+    fiveHourReset,
+    relativeReset(fiveHourReset, f.now),
+    FIVE_HOUR_WINDOW_MS,
   );
+  const weeklyReset = usage?.sevenDayResetAt ?? null;
   const weeklyRow = windowRow(
     labels[2],
     usage?.sevenDay,
     PALETTE.pink,
-    formatWeeklyReset(usage?.sevenDayResetAt ?? null, f.now),
+    weeklyReset,
+    formatWeeklyReset(weeklyReset, f.now),
+    SEVEN_DAY_WINDOW_MS,
   );
 
   // Main-session task list
@@ -424,13 +449,25 @@ function environmentRows(f: Frame, innerWidth: number): Line[] {
 
   const cache = f.stdin.prompt_cache;
   if (cache && typeof cache.hit_ratio === 'number') {
-    rows.push([
+    const cacheRow: Line = [
       s(label('panel.cache'), PALETTE.dim),
       sp(1),
       s(`${Math.round(cache.hit_ratio * 100)}%`, PALETTE.bright, true),
       sp(1),
       cache.warm ? s('●', PALETTE.green) : s('○', PALETTE.dim),
-    ]);
+    ];
+    if (cache.warm === false) {
+      // What the next request would write back into the cache (same source as adviceRow).
+      const { tokens } = contextLevel(f);
+      if (tokens > 0) cacheRow.push(s(` ↻${formatCount(tokens)}`, tokens >= COLD_CACHE_REWRITE_MIN_TOKENS ? PALETTE.amber : PALETTE.dim));
+    } else if (cache.warm === true && typeof cache.expires_at === 'number') {
+      const remaining = cache.expires_at * 1000 - f.now;
+      if (Number.isFinite(remaining) && remaining > 0 && remaining <= CACHE_EXPIRY_MAX_MS) {
+        const countdown = relativeReset(new Date(f.now + remaining), f.now);
+        cacheRow.push(s(` ${countdown}`, remaining <= CACHE_EXPIRY_WARN_MS ? PALETTE.amber : PALETTE.dim));
+      }
+    }
+    rows.push(cacheRow);
   } else {
     rows.push([]);
   }
@@ -700,8 +737,9 @@ export function panelLines(f: Frame): string[] {
   const columns = f.width ?? DEFAULT_WIDTH;
   const width = Math.max(40, Math.min(MAX_PANEL_WIDTH, f.config?.maxWidth ?? MAX_PANEL_WIDTH, columns - EDGE_MARGIN));
 
+  const sessionName = f.config?.display?.showSessionName === true ? clean(f.stdin.session_name) : '';
   const titles = {
-    session: label('panel.session'),
+    session: sessionName ? `${label('panel.session')} · ${sessionName}` : label('panel.session'),
     usage: label('panel.usage'),
     environment: label('panel.environment'),
     activity: label('panel.activity'),
