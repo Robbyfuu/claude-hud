@@ -67,6 +67,7 @@ export const en: Messages = {
   "panel.uses": "{count} uses",
   "panel.done": "done",
   "panel.thinking": "thinking…",
+  "panel.idle": "idle {duration}",
   "panel.noActivity": "no activity yet",
   "panel.noGit": "no git",
   "panel.compact": "/compact",

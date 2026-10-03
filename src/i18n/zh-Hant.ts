@@ -67,6 +67,7 @@ export const zhHant: Messages = {
   "panel.uses": "{count} 次呼叫",
   "panel.done": "完成",
   "panel.thinking": "思考中…",
+  "panel.idle": "閒置 {duration}",
   "panel.noActivity": "暫無活動",
   "panel.noGit": "無 git",
   "panel.compact": "/compact",

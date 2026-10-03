@@ -62,6 +62,8 @@ const CACHE_EXPIRY_WARN_MS = 120_000;
 // A prompt cache lives minutes to an hour; an expiry further out is bad data
 // (such as milliseconds sent as seconds), so the row shows no countdown.
 const CACHE_EXPIRY_MAX_MS = 24 * 3_600_000;
+// A running agent with no pending tool and no transcript activity this long is stalled.
+const STALL_MS = 5 * 60_000;
 
 // ---------------------------------------------------------------------------
 // Styled text
@@ -562,7 +564,10 @@ function agentCells(agent: AgentEntry, detail: SubagentDetail | undefined, now: 
     nowCell = [s(detail.currentTool.name, PALETTE.bright)];
     if (detail.currentTool.target) nowCell.push(s(` ${detail.currentTool.target}`, PALETTE.dim));
   } else {
-    nowCell = [s(label('panel.thinking'), PALETTE.dim)];
+    const idleMs = detail?.lastActivityAt ? now - detail.lastActivityAt.getTime() : NaN;
+    nowCell = idleMs >= STALL_MS
+      ? [s(interpolate(label('panel.idle'), { duration: formatDuration(idleMs).replace(/ \d+s$/, '') }), PALETTE.amber)]
+      : [s(label('panel.thinking'), PALETTE.dim)];
   }
 
   const start = agent.startTime.getTime();

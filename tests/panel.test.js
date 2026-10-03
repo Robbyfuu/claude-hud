@@ -562,3 +562,86 @@ test('renderPanel speaks Spanish in the token segment and advice row', () => {
     setLanguage('en');
   }
 });
+
+// --- stalled running agents ---
+
+function stallCtx(detail, now, status = 'running') {
+  const ctx = makeCtx({}, now);
+  ctx.transcript.agents = [
+    { id: 'toolu_a1', type: 'nestjs-developer', description: 'Fix it', status, startTime: new Date(now - 3_600_000), ...(status === 'completed' ? { endTime: new Date(now - 1000) } : {}) },
+  ];
+  ctx.subagents = new Map([['toolu_a1', { skills: [], todosDone: 0, todosTotal: 0, toolCount: 1, ...detail }]]);
+  return ctx;
+}
+
+const agentLine = (ctx, now, width = 154) =>
+  panelLines(createFrame(ctx, width, now)).find((l) => stripAnsi(l).includes('nestjs-developer'));
+
+test('renderPanel shows an amber idle duration for a running agent with no activity for 5+ minutes', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = agentLine(stallCtx({ lastActivityAt: new Date(NOW - 7 * 60_000) }, NOW), NOW);
+  assert.match(stripAnsi(line), /idle 7m/);
+  assert.ok(line.includes(`\x1b[${AMBER}midle 7m`));
+});
+
+test('renderPanel keeps thinking for a recently active agent', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(agentLine(stallCtx({ lastActivityAt: new Date(NOW - 2 * 60_000) }, NOW), NOW));
+  assert.match(line, /thinking…/);
+  assert.doesNotMatch(line, /idle/);
+});
+
+test('renderPanel never calls an agent with a pending tool idle', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const detail = { currentTool: { name: 'Bash', target: 'bun test' }, lastActivityAt: new Date(NOW - 30 * 60_000) };
+  const line = stripAnsi(agentLine(stallCtx(detail, NOW), NOW));
+  assert.match(line, /Bash bun test/);
+  assert.doesNotMatch(line, /idle/);
+});
+
+test('renderPanel shows no idle for a finished agent', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(agentLine(stallCtx({ lastActivityAt: new Date(NOW - 30 * 60_000) }, NOW, 'completed'), NOW));
+  assert.doesNotMatch(line, /idle/);
+});
+
+test('renderPanel keeps thinking when lastActivityAt is missing or invalid', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const detail of [{}, { lastActivityAt: new Date(NaN) }]) {
+    const line = stripAnsi(agentLine(stallCtx(detail, NOW), NOW));
+    assert.match(line, /thinking…/);
+  }
+});
+
+test('renderPanel formats a long idle duration with hours', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(agentLine(stallCtx({ lastActivityAt: new Date(NOW - 65 * 60_000) }, NOW), NOW));
+  assert.match(line, /idle 1h 05m/);
+});
+
+test('renderPanel speaks Spanish for an idle agent', () => {
+  setLanguage('es');
+  try {
+    const NOW = Date.now();
+    const line = stripAnsi(agentLine(stallCtx({ lastActivityAt: new Date(NOW - 7 * 60_000) }, NOW), NOW));
+    assert.match(line, /inactivo 7m/);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('renderPanel keeps the idle cell inside narrow layouts', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const width of [64, 100, 154]) {
+    const lines = panelLines(createFrame(stallCtx({ lastActivityAt: new Date(NOW - 7 * 60_000) }, NOW), width, NOW));
+    assert.equal(new Set(lines.map(cellWidth)).size, 1, `width ${width}: all lines share one width`);
+    assert.ok(lines.some((l) => stripAnsi(l).includes('idle 7m')), `width ${width}: idle shown`);
+  }
+});

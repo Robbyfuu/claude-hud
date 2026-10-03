@@ -62,6 +62,7 @@ export type MessageKey =
   | "panel.uses"
   | "panel.done"
   | "panel.thinking"
+  | "panel.idle"
   | "panel.noActivity"
   | "panel.noGit"
   | "panel.compact"
