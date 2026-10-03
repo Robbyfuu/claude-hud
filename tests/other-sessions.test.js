@@ -82,6 +82,28 @@ test('falls back to the project dir name without cwd', () =>
     assert.equal(readOtherSessions('', NOW)[0].project, '-Users-me-proj');
   }));
 
+test('a root cwd keeps looking, then falls back to the project dir name', () =>
+  withConfig((root) => {
+    session(root, '-Users-me-proj', 'a', { lines: [JSON.stringify({ type: 'user', cwd: '/' })] });
+    assert.equal(readOtherSessions('', NOW)[0].project, '-Users-me-proj');
+    session(root, 'p2', 'b', { lines: [JSON.stringify({ type: 'user', cwd: '/x/real' }), JSON.stringify({ type: 'user', cwd: '/' })] });
+    assert.ok(readOtherSessions('', NOW).some((s) => s.project === 'real'));
+  }));
+
+test('the current transcript is excluded when reached through a symlinked path', () =>
+  withConfig((root) => {
+    const cur = session(root, 'p', 'cur', { cwd: '/x/cur' });
+    session(root, 'p', 'other', { cwd: '/x/other' });
+    const link = path.join(path.dirname(root), `${path.basename(root)}-link`);
+    fs.symlinkSync(root, link);
+    try {
+      const viaLink = path.join(link, 'projects', 'p', 'cur.jsonl');
+      assert.deepEqual(readOtherSessions(viaLink, NOW).map((s) => s.project), ['other']);
+    } finally {
+      fs.unlinkSync(link);
+    }
+  }));
+
 test('half-written last line falls back to the previous line cwd', () =>
   withConfig((root) => {
     session(root, 'p', 'a', {

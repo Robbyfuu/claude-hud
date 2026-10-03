@@ -31,7 +31,9 @@ function lastCwd(file: string, size: number): string | undefined {
     for (let i = lines.length - 1; i >= 0; i--) {
       try {
         const cwd = (JSON.parse(lines[i]) as { cwd?: unknown } | null)?.cwd;
-        if (typeof cwd === 'string' && cwd) return path.basename(cwd);
+        // A root cwd ("/") has no basename: keep looking for a nameable one.
+        const base = typeof cwd === 'string' ? path.basename(cwd) : '';
+        if (base) return base;
       } catch {
         // half-written or truncated line
       }
@@ -62,7 +64,15 @@ function countActiveAgents(transcript: string, now: number): number {
 
 export function readOtherSessions(currentTranscriptPath: string, now: number): OtherSession[] {
   const root = path.join(getClaudeConfigDir(getHomeDir()), 'projects');
-  const current = currentTranscriptPath ? path.resolve(currentTranscriptPath) : '';
+  // Real paths, so a symlinked config dir can't make the current session look like another one.
+  const real = (p: string): string => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  const current = currentTranscriptPath ? real(currentTranscriptPath) : '';
   const sessions: OtherSession[] = [];
   let projectDirs: string[];
   try {
@@ -81,10 +91,11 @@ export function readOtherSessions(currentTranscriptPath: string, now: number): O
     for (const name of files) {
       if (!name.endsWith('.jsonl')) continue;
       const file = path.join(dir, name);
-      if (path.resolve(file) === current) continue;
       try {
         const st = fs.statSync(file);
         if (!st.isFile() || now - st.mtimeMs >= ACTIVE_MS) continue;
+        // Only active candidates pay for a realpath.
+        if (current && real(file) === current) continue;
         sessions.push({
           project: lastCwd(file, st.size) ?? projectDir,
           lastWriteAt: st.mtimeMs,
