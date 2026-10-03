@@ -791,3 +791,50 @@ test('renderPanel falls back to the transcript start for the session duration, m
   ctx.transcript.sessionStart = new Date(NOW - 65 * 60_000);
   assert.match(statsLine(ctx, NOW), /^│ 1h 5m · \$4\.82/);
 });
+
+// --- subagent share of tokens ---
+
+const shareCtx = (main, sub, now) => {
+  const ctx = makeCtx({ subagentTokens: sub }, now);
+  ctx.transcript.sessionTokens = main;
+  return ctx;
+};
+const tokensOf = (total) => ({ inputTokens: total, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 });
+const runningLine = (ctx, now, columns = 154) =>
+  panelLines(createFrame(ctx, columns, now)).map(stripAnsi).find((l) => /running|activo/.test(l));
+
+test('renderPanel shows the subagent share of tokens next to the agent counts', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = runningLine(shareCtx(tokensOf(100), tokensOf(300), NOW), NOW);
+  assert.match(line, /1 running · 1 done · 75% tokens by agents/);
+  const raw = panelLines(createFrame(shareCtx(tokensOf(100), tokensOf(300), NOW), 154, NOW)).find((l) => l.includes('75% tokens'));
+  assert.ok(raw.includes(`\x1b[${DIM}m · 75% tokens by agents`), stripAnsi(raw));
+});
+
+test('renderPanel shows no agent share without subagent tokens or without main tokens', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const ctx of [shareCtx(tokensOf(100), null, NOW), shareCtx(tokensOf(100), tokensOf(0), NOW), shareCtx(tokensOf(0), tokensOf(300), NOW)]) {
+    assert.doesNotMatch(runningLine(ctx, NOW), /tokens by agents/);
+  }
+});
+
+test('renderPanel speaks Spanish in the agent share', () => {
+  setLanguage('es');
+  try {
+    const NOW = Date.now();
+    assert.match(runningLine(shareCtx(tokensOf(100), tokensOf(300), NOW), NOW), /75% tokens de agentes/);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('renderPanel keeps every line one width with the agent share', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const width of [70, 100, 140]) {
+    const lines = panelLines(createFrame(shareCtx(tokensOf(100), tokensOf(300), NOW), width, NOW));
+    assert.equal(new Set(lines.map(cellWidth)).size, 1, `width ${width}`);
+  }
+});

@@ -723,6 +723,13 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
     const doneKey: MessageKey = doneCount === 1 ? 'panel.agentsDoneOne' : 'panel.agentsDone';
     right.push(s(interpolate(label(runningKey), { count: runningCount }), runningCount > 0 ? PALETTE.bright : PALETTE.dim));
     right.push(s(` · ${interpolate(label(doneKey), { count: doneCount })}`, PALETTE.dim));
+    const sum = (t: Frame['subagentTokens']) => (t ? t.inputTokens + t.outputTokens + t.cacheCreationTokens + t.cacheReadTokens : 0);
+    const main = sum(f.transcript.sessionTokens);
+    const sub = sum(f.subagentTokens);
+    if (main > 0 && sub > 0) {
+      const percent = Math.round((100 * sub) / (main + sub));
+      right.push(s(` · ${interpolate(label('panel.agentShare'), { percent })}`, PALETTE.dim));
+    }
   }
 
   const counts = Object.entries(f.transcript.toolCounts ?? {})
