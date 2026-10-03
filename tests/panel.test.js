@@ -260,6 +260,74 @@ test('renderPanel shows the advice row in medium and narrow layouts', () => {
   assert.ok(narrow.some((l) => l.includes('↻ new session · context 87%')));
 });
 
+const RED = '38;2;255;122;150';
+const AMBER = '38;2;245;194;107';
+const DIM = '38;2;138;132;160';
+const paceCtx = (usageData, now, display = { usagePace: true }) =>
+  makeCtx({ usageData, config: mergeConfig({ lineLayout: 'panel', display }) }, now);
+const usageLine = (ctx, now, name) =>
+  panelLines(createFrame(ctx, 154, now)).find((l) => stripAnsi(l).includes(`│ ${name} `));
+
+test('renderPanel marks a critical 5h pace with ▲ in red', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = paceCtx({ fiveHour: 60, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, '5 hours');
+  assert.ok(line.includes(`\x1b[1;${RED}m60%▲`), stripAnsi(line));
+  assert.ok(line.includes(`\x1b[${RED}m▇`), 'bar painted red');
+});
+
+test('renderPanel marks a warning 5h pace with ▲ in amber', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 47% after half the window projects to 94%: warning, not critical.
+  const ctx = paceCtx({ fiveHour: 47, sevenDay: 31, fiveHourResetAt: new Date(NOW + 2.5 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, '5 hours');
+  assert.ok(line.includes(`\x1b[1;${AMBER}m47%▲`), stripAnsi(line));
+  assert.ok(line.includes(`\x1b[${AMBER}m▇`), 'bar painted amber');
+});
+
+test('renderPanel never lowers a red usage band to the amber of a warning pace', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 92% with 20m left projects to ~99%: warning pace, but the band is already red.
+  const ctx = paceCtx({ fiveHour: 92, sevenDay: 31, fiveHourResetAt: new Date(NOW + 20 * 60_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, '5 hours');
+  assert.ok(line.includes(`\x1b[1;${RED}m92%▲`), stripAnsi(line));
+});
+
+test('renderPanel shows no pace marker under 10% usage', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 8% ten minutes in projects past 100%, but under 10% the projection is noise.
+  const ctx = paceCtx({ fiveHour: 8, sevenDay: 31, fiveHourResetAt: new Date(NOW + 290 * 60_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const line = stripAnsi(usageLine(ctx, NOW, '5 hours'));
+  assert.ok(!line.includes('▲'), line);
+  assert.match(line, / 8% ↻ 4h 50m/);
+});
+
+test('renderPanel ignores pace when display.usagePace is off', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const usage = { fiveHour: 60, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) };
+  for (const display of [{}, { usagePace: false }]) {
+    const line = usageLine(paceCtx(usage, NOW, display), NOW, '5 hours');
+    assert.ok(!stripAnsi(line).includes('▲'), stripAnsi(line));
+    // Today's row: violet bar and value from the percentage bands.
+    assert.ok(line.includes('\x1b[1;38;2;165;148;255m60%\x1b[0m'), stripAnsi(line));
+  }
+});
+
+test('renderPanel grades the weekly pace against the 7-day window', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  // 60% one day into the week projects to 420%. Against a 5h window the reset
+  // is more than a window away, so there would be no pace at all.
+  const ctx = paceCtx({ fiveHour: 5, sevenDay: 60, fiveHourResetAt: new Date(NOW + 2 * 3600_000), sevenDayResetAt: new Date(NOW + 6 * 86_400_000) }, NOW);
+  const line = usageLine(ctx, NOW, 'weekly');
+  assert.ok(line.includes(`\x1b[1;${RED}m60%▲`), stripAnsi(line));
+});
+
 test('renderPanel uses Nerd Font icons only when enabled', () => {
   const NOW = Date.now();
   const nerd = makeCtx({ config: mergeConfig({ lineLayout: 'panel', panel: { icons: 'nerd' } }) }, NOW);
