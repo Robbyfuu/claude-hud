@@ -436,3 +436,20 @@ test('parseSubagentTranscript takes the last line timestamp even when the prefil
     assert.equal(detail.lastActivityAt.toISOString(), '2026-01-01T00:06:00.000Z');
   });
 });
+
+test('parseSubagentTranscript reads the last line\'s own timestamp, not one nested in its content', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'agent-nested.jsonl');
+    await writeJsonl(file, [
+      at('2026-01-01T00:00:00.000Z', toolUse('t1', 'Bash', { command: 'ls' })),
+      at('2026-01-01T00:00:00.000Z', toolResult('t1')),
+      {
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: 'log', meta: { timestamp: '2025-06-01T00:00:00.000Z' } }] },
+        timestamp: '2026-01-01T00:06:00.000Z',
+      },
+    ]);
+    const detail = parseSubagentTranscript(file);
+    assert.equal(detail.lastActivityAt.toISOString(), '2026-01-01T00:06:00.000Z');
+  });
+});

@@ -302,14 +302,20 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
     }
   }
 
-  // The prefilter skips plain text, system and attachment lines, so read the last line's
-  // timestamp separately: the transcript is append-only, making it the latest write.
+  // The prefilter skips plain text, system and attachment lines, so parse the last line when it
+  // was skipped: the transcript is append-only, making it the latest write.
   const trimmed = text.trimEnd();
   const lastLine = trimmed.slice(trimmed.lastIndexOf('\n') + 1);
-  const lastStamp = /"timestamp":"([^"]+)"/.exec(lastLine)?.[1];
-  const lastAt = lastStamp ? new Date(lastStamp) : undefined;
-  if (lastAt && !Number.isNaN(lastAt.getTime()) && (!detail.lastActivityAt || lastAt > detail.lastActivityAt)) {
-    detail.lastActivityAt = lastAt;
+  if (lastLine && !lastLine.includes('"tool_') && !lastLine.includes('"usage"')) {
+    try {
+      const stamp = (JSON.parse(lastLine) as SubagentLine).timestamp;
+      const lastAt = stamp ? new Date(stamp) : undefined;
+      if (lastAt && !Number.isNaN(lastAt.getTime()) && (!detail.lastActivityAt || lastAt > detail.lastActivityAt)) {
+        detail.lastActivityAt = lastAt;
+      }
+    } catch {
+      // A half-written last line: keep the activity the loop found.
+    }
   }
 
   const taskList: TaskState[] = todoWriteList ?? Array.from(new Set([
