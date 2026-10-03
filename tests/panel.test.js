@@ -726,3 +726,20 @@ test('renderPanel keeps thinking when lastActivityAt is in the future', () => {
   assert.match(line, /thinking…/);
   assert.doesNotMatch(line, /idle/);
 });
+
+test('renderPanel keeps thinking while a quiet tool call is pending', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const detail = { hasPendingTool: true, lastActivityAt: new Date(NOW - 10 * 60_000) };
+  const line = stripAnsi(agentLine(stallCtx(detail, NOW), NOW));
+  assert.match(line, /thinking…/);
+  assert.doesNotMatch(line, /idle/);
+});
+
+test('renderPanel shows the whole short name of a long MCP tool in the NOW cell', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const name = 'mcp__plugin_context-mode_context-mode__ctx_execute';
+  const line = stripAnsi(agentLine(stallCtx({ currentTool: { name } }, NOW), NOW));
+  assert.match(line, /ctx_execute(?!\S)/);
+});

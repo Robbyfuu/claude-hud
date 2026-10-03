@@ -382,3 +382,44 @@ test('readAgentDefinitionSkills ignores a plugin name that escapes the plugin ca
     assert.deepEqual(readAgentDefinitionSkills('../../outside:secret-agent', dir), []);
   });
 });
+
+const at = (iso, entry) => ({ ...entry, timestamp: iso });
+
+test('parseSubagentTranscript advances lastActivityAt on a tool_result entry', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'agent-act.jsonl');
+    await writeJsonl(file, [
+      at('2026-01-01T00:00:00.000Z', toolUse('t1', 'Bash', { command: 'sleep 360' })),
+      at('2026-01-01T00:06:00.000Z', toolResult('t1')),
+    ]);
+    const detail = parseSubagentTranscript(file);
+    assert.equal(detail.lastActivityAt.toISOString(), '2026-01-01T00:06:00.000Z');
+  });
+});
+
+test('parseSubagentTranscript reports hasPendingTool for quiet tools without a currentTool', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'agent-quiet.jsonl');
+    await writeJsonl(file, [toolUse('t1', 'TodoWrite', { todos: [] })]);
+    const quiet = parseSubagentTranscript(file);
+    assert.equal(quiet.currentTool, undefined);
+    assert.equal(quiet.hasPendingTool, true);
+
+    await writeJsonl(file, [toolUse('t1', 'TodoWrite', { todos: [] }), toolResult('t1')]);
+    assert.equal(parseSubagentTranscript(file).hasPendingTool, false);
+
+    await writeJsonl(file, [toolUse('t2', 'Bash', { command: 'ls' })]);
+    const loud = parseSubagentTranscript(file);
+    assert.equal(loud.hasPendingTool, true);
+    assert.equal(loud.currentTool.name, 'Bash');
+  });
+});
+
+test('parseSubagentTranscript keeps a long MCP tool name whole', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'agent-mcp.jsonl');
+    const name = 'mcp__plugin_context-mode_context-mode__ctx_execute';
+    await writeJsonl(file, [toolUse('t1', name, {})]);
+    assert.equal(parseSubagentTranscript(file).currentTool.name, name);
+  });
+});

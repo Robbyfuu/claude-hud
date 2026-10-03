@@ -575,7 +575,7 @@ function agentCells(agent: AgentEntry, detail: SubagentDetail | undefined, now: 
     nowCell = [s(clean(shortToolName(detail.currentTool.name)), PALETTE.bright)];
     if (detail.currentTool.target) nowCell.push(s(` ${detail.currentTool.target}`, PALETTE.dim));
   } else {
-    const idleMs = detail?.lastActivityAt ? now - detail.lastActivityAt.getTime() : NaN;
+    const idleMs = detail?.lastActivityAt && !detail.hasPendingTool ? now - detail.lastActivityAt.getTime() : NaN;
     nowCell = idleMs >= STALL_MS
       ? [s(interpolate(label('panel.idle'), { duration: formatDuration(idleMs).replace(/ \d+s$/, '') }), PALETTE.amber)]
       : [s(label('panel.thinking'), PALETTE.dim)];
