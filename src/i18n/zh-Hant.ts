@@ -1,4 +1,5 @@
 import type { Messages } from "./types.js";
+import { panelZhHant } from "./panel.js";
 
 export const zhHant: Messages = {
   // Labels
@@ -38,47 +39,9 @@ export const zhHant: Messages = {
   "format.relativeTime": "{value} 前",
   "format.elapsed": "已過 {value}%",
 
-  // Panel layout
-  "panel.session": "會話",
-  "panel.usage": "用量",
-  "panel.environment": "環境",
-  "panel.activity": "活動",
-  "panel.context": "上下文",
-  "panel.fiveHour": "5 小時",
-  "panel.weekly": "本週",
-  "panel.tasks": "任務",
-  "panel.tools": "工具",
-  "panel.rules": "規則",
-  "panel.hooks": "鉤子",
-  "panel.cache": "快取",
-  "panel.col.agent": "代理",
-  "panel.col.task": "任務",
-  "panel.col.skills": "技能",
-  "panel.col.progress": "進度",
-  "panel.col.now": "目前",
-  "panel.col.tokens": "詞元",
-  "panel.col.time": "時間",
-  "panel.agentsRunning": "{count} 執行中",
-  "panel.agentsDone": "{count} 已完成",
-  "panel.agentsRunningOne": "{count} 執行中",
-  "panel.agentsDoneOne": "{count} 已完成",
-  "panel.moreAgents": "另有 {count} 個",
-  "panel.noPlan": "無計劃",
-  "panel.uses": "{count} 次呼叫",
-  "panel.done": "完成",
-  "panel.thinking": "思考中…",
-  "panel.idle": "閒置 {duration}",
-  "panel.noActivity": "暫無活動",
-  "panel.noGit": "無 git",
-  "panel.compact": "/compact",
-  "panel.tokens": "詞元",
-  "panel.cacheShare": "{percent}% 快取",
-  "panel.adviceNow": "新建會話",
-  "panel.adviceColdCache": "快取已冷，將重寫 {tokens}",
-  "panel.adviceSoon": "即將需要新建會話",
-
   // Init
   "init.initializing": "[claude-hud] 正在初始化...",
   "init.macosNote":
     "[claude-hud] 注意：在 macOS 上，您可能需要重新啟動 Claude Code 才能顯示 HUD。",
+  ...panelZhHant,
 };
