@@ -200,7 +200,6 @@ export interface SubagentDetail {
   currentTool?: { name: string; target?: string };
   // Any tool call, quiet or not, still waiting for its result.
   hasPendingTool?: boolean;
-  lastTool?: { name: string; target?: string };
   toolCount: number;
   // Input + cache tokens of the subagent's latest request (its context size).
   contextTokens?: number;

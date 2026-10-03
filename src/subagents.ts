@@ -280,7 +280,6 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
           const name = cleanName(block.name, MAX_TOOL_NAME_LEN) ?? 'tool';
           const tool = { name, target: describeToolTarget(block.name, input) };
           detail.toolCount += 1;
-          detail.lastTool = tool;
           pending.set(block.id, tool);
         }
       } else if (block.type === 'tool_result' && block.tool_use_id) {

@@ -128,8 +128,8 @@ mkdir -p ~/.cache/tmp && TMPDIR=~/.cache/tmp claude /plugin install claude-hud
    separator emitted by awk. GNU grep (BRE/ERE) does **not** interpret
    `\t` as a tab character — it emits `warning: stray \ before t` and
    treats the pattern as literal `t`, so the regex never matches the awk
-   output and `plugin_dir` resolves to an empty string. The runtime then
-   exits with `Module not found "src/index.ts"` and no HUD appears.
+   output and `plugin_dir` resolves to an empty string. The command then
+   exits without output and no HUD appears.
    Setup verification can hide this because some shells alias `grep` to
    alternatives (e.g. `ugrep`) that *do* expand `\t`, while the actual
    `statusLine` subprocess invokes `/usr/bin/grep`. `[[:space:]]` is a

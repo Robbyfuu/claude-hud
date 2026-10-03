@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isHudDisabled } from '../src/index.js';
+import { isHudDisabled } from '../src/index.ts';
 import { formatSessionDuration } from '../src/utils/format.js';
 
 const entry = fileURLToPath(new URL('../src/index.js', import.meta.url));

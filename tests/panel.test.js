@@ -62,7 +62,6 @@ function makeCtx(overrides = {}, now = Date.now()) {
     rulesCount: 1,
     mcpCount: 9,
     hooksCount: 17,
-    sessionDuration: '7h 11m',
     gitStatus: { branch: 'feat/kids-monthly-days-selection', isDirty: true, ahead: 2, behind: 0 },
     usageData: {
       fiveHour: 5,
