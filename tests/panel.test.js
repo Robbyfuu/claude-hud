@@ -131,7 +131,7 @@ test('renderPanel flags a critical context with /compact and handles missing dat
   ctx.stdin.context_window.used_percentage = 91;
   ctx.transcript.agents = [];
   ctx.transcript.toolCounts = {};
-  const plain = panelLines(createFrame(ctx, 140, NOW)).map(stripAnsi);
+  const plain = panelLines(createFrame(ctx, 200, NOW)).map(stripAnsi);
   assert.ok(plain.some((l) => l.includes('91%') && l.includes('/compact')));
   assert.ok(plain.some((l) => l.includes('no git')));
   assert.ok(plain.some((l) => l.includes('no activity yet')));
@@ -279,6 +279,30 @@ test('renderPanel marks a critical 5h pace with ▲ in red', () => {
   const line = usageLine(ctx, NOW, '5 hours');
   assert.ok(line.includes(`\x1b[1;${RED}m60%▲`), stripAnsi(line));
   assert.ok(line.includes(`\x1b[${RED}m▇`), 'bar painted red');
+});
+
+test('renderPanel omits the pace marker at 100% even under a critical pace', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = paceCtx({ fiveHour: 100, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+  const text = stripAnsi(usageLine(ctx, NOW, '5 hours'));
+  assert.ok(text.includes('100%'), text);
+  assert.ok(!text.includes('▲') && !text.includes('…'), text);
+});
+
+test('renderPanel keeps the pace marker intact in CJK mode below 100%', () => {
+  setLanguage('zh-Hans');
+  try {
+    const NOW = Date.now();
+    const ctx = paceCtx({ fiveHour: 62, sevenDay: 31, fiveHourResetAt: new Date(NOW + 4 * 3600_000), sevenDayResetAt: new Date(NOW + 3 * 86_400_000) }, NOW);
+    const lines = panelLines(createFrame(ctx, 200, NOW)).map(stripAnsi);
+    const line = lines.find((l) => l.includes('62%'));
+    // Wide enough that the row itself is not cut; `62%▲` is 5 cells with ▲ counted double, so it must still fit.
+    assert.ok(line?.includes('62%▲'), lines.join('\n'));
+    assert.ok(!line.includes('…'), line);
+  } finally {
+    setLanguage('en');
+  }
 });
 
 test('renderPanel marks a warning 5h pace with ▲ in amber', () => {

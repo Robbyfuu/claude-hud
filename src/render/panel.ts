@@ -383,7 +383,8 @@ function usageRows(f: Frame, innerWidth: number): Line[] {
     const band = quotaColor(pct, base);
     // Pace only raises the band's color: red stays red under a warning pace.
     const color = pace === 'critical' ? PALETTE.red : pace === 'warning' && band !== PALETTE.red ? PALETTE.amber : band;
-    const text = isPaceAlert(pace) ? `${pct}%▲` : `${pct}%`;
+    // At 100% the window is spent, and in CJK mode `100%▲` would be truncated to an ellipsis.
+    const text = isPaceAlert(pace) && pct < 100 ? `${pct}%▲` : `${pct}%`;
     return row(name, bar(pct, barWidth, color), s(text, color, true), reset ? [s(`${resetGlyph} ${reset}`, PALETTE.dim)] : []);
   };
   const fiveHourReset = usage?.fiveHourResetAt ?? null;
