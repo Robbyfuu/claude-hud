@@ -87,4 +87,14 @@ export default [
     git: 'dirty',
     snapshot: true,
   },
+  {
+    name: 'panel-extras',
+    stdin: merge(typical, {
+      session_name: 'auth-fix',
+      rate_limits: { five_hour: { used_percentage: 60, resets_at: NOW + 4 * 3_600 } },
+      prompt_cache: { warm: true, hit_ratio: 0.92, expires_at: NOW + 2_820 },
+    }),
+    config: { lineLayout: 'panel', display: { usagePace: true, showSessionName: true } },
+    columns: 140,
+  },
 ];
