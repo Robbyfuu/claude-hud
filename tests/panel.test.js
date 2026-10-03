@@ -743,3 +743,13 @@ test('renderPanel shows the whole short name of a long MCP tool in the NOW cell'
   const line = stripAnsi(agentLine(stallCtx({ currentTool: { name } }, NOW), NOW));
   assert.match(line, /ctx_execute(?!\S)/);
 });
+
+test('renderPanel keeps the tool part after the first MCP separator', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  assert.match(toolsLine({ mcp__srv__foo__bar: 3, Bash: 1 }, NOW), /foo__bar 3/);
+  const collide = toolsLine({ mcp__a__x__y: 2, mcp__b__x__y: 1 }, NOW);
+  assert.match(collide, /a:x__y 2/);
+  assert.match(collide, /b:x__y 1/);
+  assert.match(stripAnsi(agentLine(stallCtx({ currentTool: { name: 'mcp__srv__foo__bar' } }, NOW), NOW)), /foo__bar/);
+});

@@ -187,11 +187,12 @@ function quotaColor(percent: number, base: string): string {
   return base;
 }
 
+// Same shape as the transcript parser: the server is the first segment, the tool is the whole remainder.
+const MCP_TOOL = /^mcp__(.+?)__(.+)$/;
+
 /** `mcp__<server>__<tool>` becomes `<tool>`; every other name, including malformed MCP names, passes through. */
 function shortToolName(name: string): string {
-  const split = name.lastIndexOf('__');
-  // The server segment needs at least one character after "mcp__", and so does the tool.
-  return name.startsWith('mcp__') && split > 'mcp__'.length && split + 2 < name.length ? name.slice(split + 2) : name;
+  return MCP_TOOL.exec(name)?.[2] ?? name;
 }
 
 function label(key: MessageKey): string {
@@ -726,7 +727,8 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
       const [name, count] = counts[i];
       // Colliding short names fall back to server:tool so they stay distinguishable.
       const collides = (shortCounts.get(shortToolName(name)) ?? 0) > 1;
-      const shortName = name.startsWith('mcp__') && collides ? name.split('__').slice(1).join(':') : shortToolName(name);
+      const mcp = MCP_TOOL.exec(name);
+      const shortName = mcp && collides ? `${mcp[1]}:${mcp[2]}` : shortToolName(name);
       const item: Line = [s(clean(shortName), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
       const remaining = counts.length - i - 1;
       const moreWidth = remaining > 0 ? textWidth(`  +${remaining}`) : 0;
