@@ -299,6 +299,10 @@ function sessionRows(f: Frame): Line[] {
   const modelRow: Line = [s(stripContextSuffix(rawName) || rawName, PALETTE.bright, true)];
   if (windowLabel) modelRow.push(s(` · ${windowLabel}`, PALETTE.dim));
   if (effort) modelRow.push(s(` · ${clean(effort)}`, PALETTE.dim));
+  const apiMs = stdin.cost?.total_api_duration_ms;
+  if (typeof apiMs === 'number' && Number.isFinite(apiMs) && apiMs >= 60_000) {
+    modelRow.push(s(` · API ${formatDuration(apiMs).replace(/ \d+s$/, '')}`, PALETTE.dim));
+  }
 
   const projectRow: Line = [s(projectLabel(f) || '—', PALETTE.bright)];
   const addedDirs = stdin.workspace?.added_dirs?.length ?? 0;

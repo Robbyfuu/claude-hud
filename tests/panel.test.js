@@ -891,3 +891,27 @@ test('renderPanel keeps every line one width with cache misses at the minimum wi
     assert.equal(new Set(lines.map(cellWidth)).size, 1, `width ${width}`);
   }
 });
+
+// --- API time ---
+
+const modelLine = (apiMs, now) => {
+  const ctx = makeCtx({}, now);
+  if (apiMs !== undefined) ctx.stdin.cost.total_api_duration_ms = apiMs;
+  return panelLines(createFrame(ctx, 154, now)).find((l) => stripAnsi(l).includes('Opus 5.5'));
+};
+
+test('renderPanel appends the API time to the model row, dim', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = modelLine(446_705, NOW);
+  assert.match(stripAnsi(line), /Opus 5\.5 · 1M · API 7m/);
+  assert.ok(line.includes(`\x1b[${DIM}m · API 7m`), stripAnsi(line));
+});
+
+test('renderPanel shows no API time under a minute, when missing, or when not a number', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  for (const apiMs of [30_000, 59_999, undefined, '446705', null, NaN]) {
+    assert.doesNotMatch(stripAnsi(modelLine(apiMs, NOW)), /API/, String(apiMs));
+  }
+});
