@@ -62,6 +62,10 @@ const CACHE_EXPIRY_WARN_MS = 120_000;
 // A prompt cache lives minutes to an hour; an expiry further out is bad data
 // (such as milliseconds sent as seconds), so the row shows no countdown.
 const CACHE_EXPIRY_MAX_MS = 24 * 3_600_000;
+// A running agent with no pending tool and no transcript activity this long is stalled.
+const STALL_MS = 5 * 60_000;
+
+const OPAQUE_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 // ---------------------------------------------------------------------------
 // Styled text
@@ -183,6 +187,14 @@ function quotaColor(percent: number, base: string): string {
   return base;
 }
 
+// Same shape as the transcript parser: the server is the first segment, the tool is the whole remainder.
+const MCP_TOOL = /^mcp__(.+?)__(.+)$/;
+
+/** `mcp__<server>__<tool>` becomes `<tool>`; every other name, including malformed MCP names, passes through. */
+function shortToolName(name: string): string {
+  return MCP_TOOL.exec(name)?.[2] ?? name;
+}
+
 function label(key: MessageKey): string {
   return t(key);
 }
@@ -280,7 +292,9 @@ function sessionRows(f: Frame): Line[] {
   if (addedDirs > 0) projectRow.push(s(` +${addedDirs}`, PALETTE.dim));
   if (stdin.workspace?.git_worktree) {
     const worktreeGlyph = f.config?.panel?.icons === 'nerd' ? NERD_ICONS.worktree : '⎇';
-    projectRow.push(s(` ${worktreeGlyph} ${clean(stdin.workspace.git_worktree)}`, PALETTE.dim));
+    // Opaque ids (Orca worktrees carry a UUID) add nothing the project label lacks.
+    const worktree = clean(stdin.workspace.git_worktree);
+    projectRow.push(s(OPAQUE_ID.test(worktree) ? ` ${worktreeGlyph}` : ` ${worktreeGlyph} ${worktree}`, PALETTE.dim));
   }
 
   const git = f.gitStatus;
@@ -559,10 +573,13 @@ function agentCells(agent: AgentEntry, detail: SubagentDetail | undefined, now: 
   if (!running) {
     nowCell = [s('—', PALETTE.dim)];
   } else if (detail?.currentTool) {
-    nowCell = [s(detail.currentTool.name, PALETTE.bright)];
+    nowCell = [s(clean(shortToolName(detail.currentTool.name)), PALETTE.bright)];
     if (detail.currentTool.target) nowCell.push(s(` ${detail.currentTool.target}`, PALETTE.dim));
   } else {
-    nowCell = [s(label('panel.thinking'), PALETTE.dim)];
+    const idleMs = detail?.lastActivityAt && !detail.hasPendingTool ? now - detail.lastActivityAt.getTime() : NaN;
+    nowCell = idleMs >= STALL_MS
+      ? [s(interpolate(label('panel.idle'), { duration: formatDuration(idleMs).replace(/ \d+s$/, '') }), PALETTE.amber)]
+      : [s(label('panel.thinking'), PALETTE.dim)];
   }
 
   const start = agent.startTime.getTime();
@@ -700,13 +717,18 @@ function activityRows(f: Frame, innerWidth: number, includeEnvironment: boolean)
   const toolsLabel = label('panel.tools');
   const leftBudget = innerWidth - lineWidth(right) - (right.length > 0 ? 2 : 0);
   const left: Line = [s(toolsLabel, PALETTE.dim), sp(2)];
+  const shortCounts = new Map<string, number>();
+  for (const [name] of counts) shortCounts.set(shortToolName(name), (shortCounts.get(shortToolName(name)) ?? 0) + 1);
   if (counts.length === 0) {
     left.push(s(label('panel.noActivity'), PALETTE.dim));
   } else {
     let used = lineWidth(left);
     for (let i = 0; i < counts.length; i++) {
       const [name, count] = counts[i];
-      const shortName = name.startsWith('mcp__') ? name.split('__').slice(1).join(':') : name;
+      // Colliding short names fall back to server:tool so they stay distinguishable.
+      const collides = (shortCounts.get(shortToolName(name)) ?? 0) > 1;
+      const mcp = MCP_TOOL.exec(name);
+      const shortName = mcp && collides ? `${mcp[1]}:${mcp[2]}` : shortToolName(name);
       const item: Line = [s(clean(shortName), PALETTE.fg), sp(1), s(String(count), PALETTE.cyan, true)];
       const remaining = counts.length - i - 1;
       const moreWidth = remaining > 0 ? textWidth(`  +${remaining}`) : 0;

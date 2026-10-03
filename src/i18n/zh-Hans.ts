@@ -67,6 +67,7 @@ export const zhHans: Messages = {
   "panel.uses": "{count} 次调用",
   "panel.done": "完成",
   "panel.thinking": "思考中…",
+  "panel.idle": "空闲 {duration}",
   "panel.noActivity": "暂无活动",
   "panel.noGit": "无 git",
   "panel.compact": "/compact",

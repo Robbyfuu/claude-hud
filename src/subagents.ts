@@ -19,6 +19,7 @@ const debug = createDebug('subagents');
 const MAX_META_FILES = 500;
 const MAX_TRANSCRIPT_BYTES = 32 * 1024 * 1024;
 const MAX_NAME_LEN = 48;
+const MAX_TOOL_NAME_LEN = 128;
 const MAX_TARGET_LEN = 80;
 const MAX_SKILLS = 8;
 const MAX_AGENT_DEF_FILES = 400;
@@ -213,6 +214,8 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
   const detail: SubagentDetail = { skills: [], todosDone: 0, todosTotal: 0, toolCount: 0 };
   const skills = new Set<string>();
   const pending = new Map<string, { name: string; target?: string }>();
+  // Every tool_use without a result yet, quiet tools included.
+  const pendingIds = new Set<string>();
   const tasks = new Map<string, TaskState>();
   const createdByToolUse = new Map<string, TaskState>();
   let todoWriteList: TaskState[] | null = null;
@@ -231,8 +234,10 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
     const at = entry.timestamp ? new Date(entry.timestamp) : undefined;
     const hasTime = at !== undefined && !Number.isNaN(at.getTime());
 
+    // Any timestamped entry counts: the clock means "nothing written to the transcript".
+    if (hasTime) detail.lastActivityAt = at;
+
     if (entry.type === 'assistant') {
-      if (hasTime) detail.lastActivityAt = at;
       const usage = entry.message?.usage;
       if (usage) {
         const total = (usage.input_tokens ?? 0)
@@ -271,8 +276,10 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
           }));
         }
 
+        pendingIds.add(block.id);
         if (!QUIET_TOOLS.has(block.name)) {
-          const name = cleanName(block.name) ?? 'tool';
+          // Full length: the panel shortens MCP names, so truncating here would cut the tool part.
+          const name = cleanName(block.name, MAX_TOOL_NAME_LEN) ?? 'tool';
           const tool = { name, target: describeToolTarget(block.name, input) };
           detail.toolCount += 1;
           detail.lastTool = tool;
@@ -280,6 +287,7 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
         }
       } else if (block.type === 'tool_result' && block.tool_use_id) {
         pending.delete(block.tool_use_id);
+        pendingIds.delete(block.tool_use_id);
         const created = createdByToolUse.get(block.tool_use_id);
         const assignedId = entry.toolUseResult?.task?.id;
         if (created && (typeof assignedId === 'string' || typeof assignedId === 'number')) {
@@ -294,6 +302,22 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
     }
   }
 
+  // The prefilter skips plain text, system and attachment lines, so parse the last line when it
+  // was skipped: the transcript is append-only, making it the latest write.
+  const trimmed = text.trimEnd();
+  const lastLine = trimmed.slice(trimmed.lastIndexOf('\n') + 1);
+  if (lastLine && !lastLine.includes('"tool_') && !lastLine.includes('"usage"')) {
+    try {
+      const stamp = (JSON.parse(lastLine) as SubagentLine).timestamp;
+      const lastAt = stamp ? new Date(stamp) : undefined;
+      if (lastAt && !Number.isNaN(lastAt.getTime()) && (!detail.lastActivityAt || lastAt > detail.lastActivityAt)) {
+        detail.lastActivityAt = lastAt;
+      }
+    } catch {
+      // A half-written last line: keep the activity the loop found.
+    }
+  }
+
   const taskList: TaskState[] = todoWriteList ?? Array.from(new Set([
     ...createdByToolUse.values(),
     ...tasks.values(),
@@ -304,6 +328,7 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
 
   const pendingTools = Array.from(pending.values());
   detail.currentTool = pendingTools[pendingTools.length - 1];
+  detail.hasPendingTool = pendingIds.size > 0;
   detail.skills = Array.from(skills);
   return detail;
 }
