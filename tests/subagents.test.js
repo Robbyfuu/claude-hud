@@ -13,8 +13,8 @@ import {
   readSubagentDetails,
   getSubagentsDir,
   readSubagentTokenTotals,
-  selectPanelAgents,
 } from '../src/subagents.js';
+import { selectPanelAgents } from '../src/panel-agents.js';
 
 async function withTempDir(fn) {
   const dir = await mkdtemp(path.join(tmpdir(), 'hud-panel-'));
@@ -452,4 +452,69 @@ test('parseSubagentTranscript reads the last line\'s own timestamp, not one nest
     const detail = parseSubagentTranscript(file);
     assert.equal(detail.lastActivityAt.toISOString(), '2026-01-01T00:06:00.000Z');
   });
+});
+
+test('readSubagentTokenTotals does not cache a non-empty transcript that parsed to zero tokens', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    await writeJsonl(path.join(subagentsDir, 'agent-a.jsonl'), [{ type: 'user', message: { role: 'user', content: 'hello' } }]);
+    await writeJsonl(path.join(subagentsDir, 'agent-b.jsonl'), [usageLine('msg_b1', 10, 20, 30, 40)]);
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
+    const cache = JSON.parse(fs.readFileSync(tokenCachePath(subagentsDir), 'utf8'));
+    assert.equal('agent-a.jsonl' in cache.files, false);
+    assert.equal('agent-b.jsonl' in cache.files, true);
+  });
+});
+
+test('readSubagentTokenTotals re-parses a cached all-zero entry for a non-empty transcript', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    const file = path.join(subagentsDir, 'agent-a.jsonl');
+    await writeJsonl(file, [usageLine('msg_a1', 10, 20, 30, 40)]);
+    await readSubagentTokenTotals(transcriptPath);
+    // An older build cached a failed read as zero tokens under the file's current size and mtime.
+    const cacheFile = tokenCachePath(subagentsDir);
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    cache.files['agent-a.jsonl'].tokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+    fs.writeFileSync(cacheFile, JSON.stringify(cache));
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
+  });
+});
+
+async function cacheKeyScenario(mutate) {
+  return withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    const file = path.join(subagentsDir, 'agent-a.jsonl');
+    await writeJsonl(file, [usageLine('msg_a1', 10, 20, 30, 40)]);
+    fs.utimesSync(file, 1_700_000_000, 1_700_000_000); // whole-second mtime so it can be restored exactly
+    await readSubagentTokenTotals(transcriptPath);
+    const cacheFile = tokenCachePath(subagentsDir);
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    cache.files['agent-a.jsonl'].tokens.inputTokens = 777; // sentinel: shows up only on a cache hit
+    fs.writeFileSync(cacheFile, JSON.stringify(cache));
+    const before = fs.statSync(file);
+    mutate(file, before);
+    return (await readSubagentTokenTotals(transcriptPath)).inputTokens;
+  });
+}
+
+test('readSubagentTokenTotals re-parses when only the mtime changed', async () => {
+  const input = await cacheKeyScenario((file, st) => {
+    fs.utimesSync(file, st.atime, new Date(st.mtimeMs + 5000));
+  });
+  assert.equal(input, 10);
+});
+
+test('readSubagentTokenTotals re-parses when only the size changed', async () => {
+  const input = await cacheKeyScenario((file, st) => {
+    fs.appendFileSync(file, '\n');
+    fs.utimesSync(file, 1_700_000_000, 1_700_000_000);
+  });
+  assert.equal(input, 10);
 });

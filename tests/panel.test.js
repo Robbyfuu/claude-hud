@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { panelLines } from '../src/render/panel.js';
+import { panelLines, formatCount } from '../src/render/panel.js';
 import { createFrame } from '../src/render/frame.js';
 import { mergeConfig } from '../src/config.js';
 import { setLanguage } from '../src/i18n/index.js';
@@ -62,7 +62,6 @@ function makeCtx(overrides = {}, now = Date.now()) {
     rulesCount: 1,
     mcpCount: 9,
     hooksCount: 17,
-    sessionDuration: '7h 11m',
     gitStatus: { branch: 'feat/kids-monthly-days-selection', isDirty: true, ahead: 2, behind: 0 },
     usageData: {
       fiveHour: 5,
@@ -752,4 +751,43 @@ test('renderPanel keeps the tool part after the first MCP separator', () => {
   assert.match(collide, /a:x__y 2/);
   assert.match(collide, /b:x__y 1/);
   assert.match(stripAnsi(agentLine(stallCtx({ currentTool: { name: 'mcp__srv__foo__bar' } }, NOW), NOW)), /foo__bar/);
+});
+
+test('formatCount picks the unit from the rounded value', () => {
+  const cases = [
+    [1_791_000_000, '1.8B'],
+    [12_400_000_000, '12B'],
+    [999_600, '1M'],
+    [999_700_000, '1B'],
+    [1_500_000, '1.5M'],
+    [45_000, '45k'],
+    [999_499, '999k'],
+    [999_499_999, '999M'],
+    [9_960_000, '10M'],
+    [9_950_000, '10M'],
+    [9_950_000_000, '10B'],
+    [1_250_000, '1.3M'],
+  ];
+  for (const [input, expected] of cases) assert.equal(formatCount(input), expected, String(input));
+});
+
+test('renderPanel renders the provided panelAgents instead of recomputing the selection', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = stallCtx({}, NOW, 'completed');
+  // Ended long past the retention window: recomputing at f.now would drop it.
+  const stale = { ...ctx.transcript.agents[0], endTime: new Date(NOW - 3_600_000) };
+  ctx.transcript.agents = [stale];
+  assert.equal(agentLine(ctx, NOW), undefined);
+  ctx.panelAgents = { shown: [stale], hiddenRunning: 0 };
+  assert.ok(agentLine(ctx, NOW));
+});
+
+test('renderPanel falls back to the transcript start for the session duration, measured from f.now', () => {
+  setLanguage('en');
+  const NOW = Date.parse('2026-01-01T12:00:00.000Z'); // far from the real clock
+  const ctx = makeCtx({}, NOW);
+  ctx.stdin.cost = { ...ctx.stdin.cost, total_duration_ms: undefined };
+  ctx.transcript.sessionStart = new Date(NOW - 65 * 60_000);
+  assert.match(statsLine(ctx, NOW), /^│ 1h 5m · \$4\.82/);
 });

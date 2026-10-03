@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { isHudDisabled } from '../src/index.js';
 import { formatSessionDuration } from '../src/utils/format.js';
 
-const entry = fileURLToPath(new URL('../src/index.js', import.meta.url));
+const entry = fileURLToPath(new URL('../src/index.ts', import.meta.url));
 
 async function runCli(input, env = {}) {
   const home = await mkdtemp(path.join(tmpdir(), 'hud-index-'));

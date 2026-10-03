@@ -5,7 +5,7 @@ import { getCanonicalLanguage, interpolate, t } from '../i18n/index.js';
 import type { MessageKey } from '../i18n/types.js';
 import { sanitizeDisplayText } from '../utils/sanitize.js';
 import { formatSessionDuration } from '../utils/format.js';
-import { selectPanelAgents } from '../subagents.js';
+import { selectPanelAgents } from '../panel-agents.js';
 import { FIVE_HOUR_WINDOW_MS, SEVEN_DAY_WINDOW_MS, getUsagePace, isPaceAlert } from '../usage-pace.js';
 import { shortModel } from './activity.js';
 import { sliceToWidth, textWidth } from './ansi.js';
@@ -155,9 +155,22 @@ function formatDuration(ms: number): string {
   return `${hours}h ${String(mins % 60).padStart(2, '0')}m`;
 }
 
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(/\.0$/, '')}M`;
-  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+export function formatCount(n: number): string {
+  // Pick the unit from the rounded value so a boundary never prints 1000k or 1000M.
+  // Round tenths numerically: toFixed(1) rounds 9.95 down to 9.9 because 9.95 is stored just below it.
+  const scaled = (value: number): string => {
+    const tenths = Math.round(value * 10) / 10;
+    return tenths >= 10 ? String(Math.round(value)) : String(tenths);
+  };
+  if (n >= 1_000_000) {
+    const millions = scaled(n / 1_000_000);
+    if (Number(millions) < 1000) return `${millions}M`;
+    return `${scaled(n / 1_000_000_000)}B`;
+  }
+  if (n >= 1000) {
+    const thousands = Math.round(n / 1000);
+    return thousands < 1000 ? `${thousands}k` : '1M';
+  }
   return String(n);
 }
 
@@ -656,7 +669,7 @@ function planColumns(innerWidth: number): Column[] | null {
 }
 
 function agentTable(f: Frame, innerWidth: number): Line[] {
-  const { shown, hiddenRunning } = selectPanelAgents(f.transcript.agents ?? [], f.config, f.now);
+  const { shown, hiddenRunning } = f.panelAgents ?? selectPanelAgents(f.transcript.agents ?? [], f.config, f.now);
   if (shown.length === 0) return [];
 
   const lines: Line[] = [[s('┈'.repeat(innerWidth), PALETTE.faint)]];

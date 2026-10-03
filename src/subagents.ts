@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { HudConfig } from './config.js';
 import type { AgentEntry, SessionTokenUsage, SubagentDetail } from './types.js';
 import { getClaudeConfigDir, getHomeDir, getHudPluginDir } from './claude-config-dir.js';
 import { parseTranscript } from './transcript.js';
@@ -23,7 +22,6 @@ const MAX_TOOL_NAME_LEN = 128;
 const MAX_TARGET_LEN = 80;
 const MAX_SKILLS = 8;
 const MAX_AGENT_DEF_FILES = 400;
-const MAX_COMPLETED_SHOWN = 2;
 
 // Bookkeeping tools that say nothing about what the agent is doing.
 const QUIET_TOOLS = new Set([
@@ -282,7 +280,6 @@ export function parseSubagentTranscript(filePath: string): SubagentDetail | null
           const name = cleanName(block.name, MAX_TOOL_NAME_LEN) ?? 'tool';
           const tool = { name, target: describeToolTarget(block.name, input) };
           detail.toolCount += 1;
-          detail.lastTool = tool;
           pending.set(block.id, tool);
         }
       } else if (block.type === 'tool_result' && block.tool_use_id) {
@@ -547,15 +544,19 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
     } catch {
       // Unstatable: parse without caching.
     }
+    // parseTranscript fails soft: a read error yields zero tokens. A non-empty file with zero tokens is
+    // never trusted from the cache nor stored in it, so it is re-parsed until a read succeeds.
+    const suspect = (t: SessionTokenUsage): boolean => !!stat && stat.size > 0
+      && !t.inputTokens && !t.outputTokens && !t.cacheCreationTokens && !t.cacheReadTokens;
     const hit = cached[name];
     let tokens: SessionTokenUsage | undefined;
-    if (stat && hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) {
+    if (stat && hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs && !suspect(hit.tokens)) {
       tokens = hit.tokens;
     } else {
       tokens = (await parseTranscript(file)).sessionTokens;
     }
     if (!tokens) continue;
-    if (stat) next[name] = { size: stat.size, mtimeMs: stat.mtimeMs, tokens };
+    if (stat && !suspect(tokens)) next[name] = { size: stat.size, mtimeMs: stat.mtimeMs, tokens };
     total.inputTokens += tokens.inputTokens;
     total.outputTokens += tokens.outputTokens;
     total.cacheCreationTokens += tokens.cacheCreationTokens;
@@ -595,27 +596,4 @@ export function readSubagentDetails(
     details.set(agent.id, detail);
   }
   return details;
-}
-
-export function selectPanelAgents(
-  agents: AgentEntry[],
-  config: Pick<HudConfig, 'panel'> | undefined,
-  now: number,
-): { shown: AgentEntry[]; hiddenRunning: number } {
-  const maxAgents = config?.panel?.maxAgents ?? 5;
-  const retentionMs = (config?.panel?.completedRetentionSeconds ?? 120) * 1000;
-
-  const running = agents.filter((agent) => agent.status === 'running');
-  const runningShown = running.slice(-maxAgents);
-  const completedSlots = Math.min(MAX_COMPLETED_SHOWN, maxAgents - runningShown.length);
-  const completed = completedSlots > 0
-    ? agents
-      .filter((agent) => {
-        const end = agent.endTime?.getTime();
-        return agent.status === 'completed' && end !== undefined && now - end <= retentionMs;
-      })
-      .slice(-completedSlots)
-    : [];
-
-  return { shown: [...runningShown, ...completed], hiddenRunning: running.length - runningShown.length };
 }
