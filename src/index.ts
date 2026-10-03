@@ -1,7 +1,8 @@
 import { getHomeDir } from "./claude-config-dir.js";
 import { getUsageFromStdin, isContextUnreported, readStdin } from "./stdin.js";
 import { parseTranscript } from "./transcript.js";
-import { readSubagentDetails, readSubagentTokenTotals, selectPanelAgents } from "./subagents.js";
+import { readSubagentDetails, readSubagentTokenTotals } from "./subagents.js";
+import { selectPanelAgents } from "./panel-agents.js";
 import { render } from "./render/index.js";
 import { countConfigs, type ConfigCounts } from "./config-reader.js";
 import { getGitStatus, type GitRepoIdentity, type GitStatus } from "./git.js";
@@ -77,9 +78,8 @@ export async function main(): Promise<void> {
       display.showMemoryUsage && config.lineLayout === "expanded" ? getMemoryUsage() : null,
       isPanel ? readSubagentTokenTotals(stdin.transcript_path ?? "") : null,
     ]);
-    const subagents = isPanel
-      ? readSubagentDetails(stdin.transcript_path ?? "", selectPanelAgents(transcript.agents, config, now).shown, stdin.cwd)
-      : undefined;
+    const panelAgents = isPanel ? selectPanelAgents(transcript.agents, config, now) : undefined;
+    const subagents = panelAgents ? readSubagentDetails(stdin.transcript_path ?? "", panelAgents.shown, stdin.cwd) : undefined;
 
     const stdinUsage = getUsageFromStdin(stdin);
     if (display.externalUsageWritePath && stdinUsage) {
@@ -103,6 +103,7 @@ export async function main(): Promise<void> {
       authInfo: display.showAuth || display.showAuthUser ? readAuthInfo() : null,
       subagents,
       subagentTokens,
+      panelAgents,
     });
   } catch (error) {
     console.log("[claude-hud] Error:", error instanceof Error ? error.message : "Unknown error");

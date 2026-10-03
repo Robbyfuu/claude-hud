@@ -5,7 +5,7 @@ import { getCanonicalLanguage, interpolate, t } from '../i18n/index.js';
 import type { MessageKey } from '../i18n/types.js';
 import { sanitizeDisplayText } from '../utils/sanitize.js';
 import { formatSessionDuration } from '../utils/format.js';
-import { selectPanelAgents } from '../subagents.js';
+import { selectPanelAgents } from '../panel-agents.js';
 import { FIVE_HOUR_WINDOW_MS, SEVEN_DAY_WINDOW_MS, getUsagePace, isPaceAlert } from '../usage-pace.js';
 import { shortModel } from './activity.js';
 import { sliceToWidth, textWidth } from './ansi.js';
@@ -665,7 +665,7 @@ function planColumns(innerWidth: number): Column[] | null {
 }
 
 function agentTable(f: Frame, innerWidth: number): Line[] {
-  const { shown, hiddenRunning } = selectPanelAgents(f.transcript.agents ?? [], f.config, f.now);
+  const { shown, hiddenRunning } = f.panelAgents ?? selectPanelAgents(f.transcript.agents ?? [], f.config, f.now);
   if (shown.length === 0) return [];
 
   const lines: Line[] = [[s('┈'.repeat(innerWidth), PALETTE.faint)]];

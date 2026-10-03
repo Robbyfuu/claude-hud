@@ -765,3 +765,15 @@ test('formatCount picks the unit from the rounded value', () => {
   ];
   for (const [input, expected] of cases) assert.equal(formatCount(input), expected, String(input));
 });
+
+test('renderPanel renders the provided panelAgents instead of recomputing the selection', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const ctx = stallCtx({}, NOW, 'completed');
+  // Ended long past the retention window: recomputing at f.now would drop it.
+  const stale = { ...ctx.transcript.agents[0], endTime: new Date(NOW - 3_600_000) };
+  ctx.transcript.agents = [stale];
+  assert.equal(agentLine(ctx, NOW), undefined);
+  ctx.panelAgents = { shown: [stale], hiddenRunning: 0 };
+  assert.ok(agentLine(ctx, NOW));
+});

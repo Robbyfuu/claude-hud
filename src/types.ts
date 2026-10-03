@@ -224,4 +224,5 @@ export interface RenderContext {
   authInfo?: AuthInfo | null;
   subagents?: Map<string, SubagentDetail>;
   subagentTokens?: SessionTokenUsage | null;
+  panelAgents?: { shown: AgentEntry[]; hiddenRunning: number };
 }

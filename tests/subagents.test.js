@@ -13,8 +13,8 @@ import {
   readSubagentDetails,
   getSubagentsDir,
   readSubagentTokenTotals,
-  selectPanelAgents,
 } from '../src/subagents.js';
+import { selectPanelAgents } from '../src/panel-agents.js';
 
 async function withTempDir(fn) {
   const dir = await mkdtemp(path.join(tmpdir(), 'hud-panel-'));
