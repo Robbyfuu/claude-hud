@@ -266,6 +266,6 @@ test('panel lists other active sessions from the config dir', async () => {
   // eslint-disable-next-line no-control-regex
   const plain = raw.replace(/\x1b\[[0-9;]*m/g, '').trimEnd();
   assert.match(plain, /other-proj/);
-  const widths = new Set(plain.split('\n').map((line) => [...line].length));
+  const widths = new Set(plain.split("\n").map((line) => Bun.stringWidth(line)));
   assert.equal(widths.size, 1, `every line keeps the panel width in:\n${plain}`);
 });

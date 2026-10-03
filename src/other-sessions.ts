@@ -11,7 +11,6 @@ export interface OtherSession {
 const ACTIVE_MS = 15 * 60_000;
 const AGENT_ACTIVE_MS = 2 * 60_000;
 const TAIL_BYTES = 64 * 1024;
-const MAX_SESSIONS = 20;
 
 function readTail(file: string, size: number): string {
   const fd = fs.openSync(file, 'r');
@@ -51,7 +50,8 @@ function countActiveAgents(transcript: string, now: number): number {
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith('.jsonl')) continue;
       try {
-        if (now - fs.statSync(path.join(dir, name)).mtimeMs < AGENT_ACTIVE_MS) count++;
+        const st = fs.statSync(path.join(dir, name));
+        if (st.isFile() && now - st.mtimeMs < AGENT_ACTIVE_MS) count++;
       } catch {
         // vanished between readdir and stat
       }
@@ -107,5 +107,6 @@ export function readOtherSessions(currentTranscriptPath: string, now: number): O
     }
   }
   sessions.sort((a, b) => Number(b.agentsActive > 0) - Number(a.agentsActive > 0) || b.lastWriteAt - a.lastWriteAt);
-  return sessions.slice(0, MAX_SESSIONS);
+  // Uncapped: the render shows four and needs the true count for its +N.
+  return sessions;
 }

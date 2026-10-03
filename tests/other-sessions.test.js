@@ -141,8 +141,18 @@ test('reads cwd from the tail of a 2 MB transcript', () =>
     assert.equal(readOtherSessions('', NOW)[0].project, 'tail-proj');
   }));
 
-test('returns at most 20 sessions', () =>
+test('returns every active session so the +N count stays exact', () =>
   withConfig((root) => {
     for (let i = 0; i < 25; i++) session(root, 'p', `s${i}`, { cwd: `/x/p${i}` });
-    assert.equal(readOtherSessions('', NOW).length, 20);
+    assert.equal(readOtherSessions('', NOW).length, 25);
+  }));
+
+test('a directory named like a subagent transcript is not counted as an agent', () =>
+  withConfig((root) => {
+    const file = session(root, 'p', 'a', { cwd: '/x/a' });
+    agent(file, 'agent-real', MIN);
+    const fake = path.join(file.replace(/\.jsonl$/, ''), 'subagents', 'agent-dir.jsonl');
+    fs.mkdirSync(fake);
+    touch(fake, MIN);
+    assert.equal(readOtherSessions('', NOW)[0].agentsActive, 1);
   }));

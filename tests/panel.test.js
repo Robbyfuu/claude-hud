@@ -975,9 +975,23 @@ test('renderPanel shows four sessions and counts the rest', () => {
 });
 
 test('renderPanel translates the sessions row to Spanish', () => {
-  const { row } = sessionsRow([sess('icloud-sync', 0, 9 * 60_000)], { lang: 'es' });
-  assert.match(stripAnsi(row), /sesiones {2}icloud-sync inactiva 9m/);
-  setLanguage('en');
+  try {
+    const { row } = sessionsRow([sess('icloud-sync', 0, 9 * 60_000)], { lang: 'es' });
+    assert.match(stripAnsi(row), /sesiones {2}icloud-sync inactiva 9m/);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('renderPanel keeps the +N marker when the first session name fills a narrow row', () => {
+  const long = 'a-very-long-repository-name-that-will-not-fit-in-a-narrow-panel';
+  for (const width of [64, 70]) {
+    const { row } = sessionsRow([sess(long, 1), sess('second'), sess('third')], { width });
+    assert.match(stripAnsi(row), /\+2 *│$/, `${width}: ${stripAnsi(row)}`);
+  }
+  // With room for the second session, the marker counts only the one left out.
+  const { row } = sessionsRow([sess(long, 1), sess('second'), sess('third')], { width: 100 });
+  assert.match(stripAnsi(row), /· second {2}\+1 *│$/, stripAnsi(row));
 });
 
 test('renderPanel sanitizes control characters in a session project name', () => {

@@ -748,8 +748,10 @@ function otherSessionsRow(f: Frame, innerWidth: number): Line {
       break;
     }
     const part = [...sep, ...entry];
-    row.push(...(i === 0 ? truncate(part, innerWidth - used) : part));
-    used += lineWidth(part);
+    // A truncated first entry still leaves room for the +N marker of the sessions after it.
+    const pushed = i === 0 ? truncate(part, innerWidth - used - (i < sessions.length - 1 ? moreWidth : 0)) : part;
+    row.push(...pushed);
+    used += lineWidth(pushed);
   }
   return fit(row, innerWidth);
 }
