@@ -11,6 +11,9 @@ All notable changes to Claude HUD will be documented in this file.
 - The `panel` agent table shows `idle 7m` in amber for a running subagent with no pending tool and no activity for 5 minutes. (Fork only.)
 - The `panel` tools row and NOW cell show short MCP tool names (`ctx_execute`), keeping `server:tool` when names collide. (Fork only.)
 - The `panel` session box omits opaque UUID worktree names, keeping only the worktree glyph. (Fork only.)
+- The `panel` activity header shows the share of tokens spent by subagents (`75% tokens by agents`). (Fork only.)
+- The `panel` cache row shows prompt-cache misses and the tokens they rewrote (`3✗ 284k`). (Fork only.)
+- The `panel` model row shows the time spent on the model API (`API 7m`) from one minute. (Fork only.)
 
 ### Fixed
 - A folder name containing ` │ ` no longer leaves the project link open over the rest of the HUD when line 1 wraps.
