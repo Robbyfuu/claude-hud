@@ -761,6 +761,9 @@ test('formatCount picks the unit from the rounded value', () => {
     [999_700_000, '1B'],
     [1_500_000, '1.5M'],
     [45_000, '45k'],
+    [999_499, '999k'],
+    [999_499_999, '999M'],
+    [9_960_000, '10M'],
   ];
   for (const [input, expected] of cases) assert.equal(formatCount(input), expected, String(input));
 });
