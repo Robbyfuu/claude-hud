@@ -244,6 +244,9 @@ The session box's last row adds the session's token total after the cost, includ
 When starting fresh would help, a fifth row shows one hint, highest priority first: `↻ new session · context 87%` (context at or above `display.contextCriticalThreshold`), `↻ new session · cold cache, rewrites 659k` (prompt cache cold with at least 200k context tokens), or `↻ new session soon · context 72%` (context at or above `display.contextWarningThreshold`).
 The panel honours `display.usagePace`, marking a 5-hour or weekly window on pace to run out with `▲` (`60%▲`, amber or red), and `display.showSessionName`, which adds the session name to the session box title (`session · auth-fix`).
 The cache row shows the time until a warm cache expires (`cache 92% ● 47m`, amber in the last two minutes) and, when the cache is cold, the context tokens the next request would rewrite (`cache 40% ○ ↻300k`, amber from 200k).
+A running subagent with no pending tool and no transcript activity for 5 minutes shows `idle 7m` in amber in its NOW cell instead of `thinking…`; a pending tool call never counts as idle.
+MCP tools show only the tool part of `mcp__<server>__<tool>` (`ctx_execute 5`), falling back to `server:tool` when two servers expose the same tool name.
+A worktree whose name contains a UUID (such as Orca's) shows only the worktree glyph in the session box, since the project label already names the folder.
 
 Finished subagent transcripts are parsed once: the panel caches their token totals under `plugins/claude-hud/subagent-tokens/` and re-reads a transcript only when its size or modification time changes.
 

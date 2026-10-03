@@ -8,6 +8,9 @@ All notable changes to Claude HUD will be documented in this file.
 - The `panel` layout honours `display.usagePace`: the 5-hour and weekly rows turn amber or red with a `▲` when on pace to run out. (Fork only.)
 - The `panel` layout honours `display.showSessionName`, adding the session name to the session box title. (Fork only.)
 - The `panel` cache row shows the time until a warm cache expires, and the context tokens a cold cache would rewrite. (Fork only.)
+- The `panel` agent table shows `idle 7m` in amber for a running subagent with no pending tool and no activity for 5 minutes. (Fork only.)
+- The `panel` tools row and NOW cell show short MCP tool names (`ctx_execute`), keeping `server:tool` when names collide. (Fork only.)
+- The `panel` session box omits opaque UUID worktree names, keeping only the worktree glyph. (Fork only.)
 
 ### Fixed
 - A folder name containing ` │ ` no longer leaves the project link open over the rest of the HUD when line 1 wraps.
