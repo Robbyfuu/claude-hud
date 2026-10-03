@@ -4,6 +4,7 @@ import { mergeConfig } from '../src/config.js';
 import { setLanguage, t } from '../src/i18n/index.js';
 import { en } from '../src/i18n/en.js';
 import { es } from '../src/i18n/es.js';
+import { panelEn, panelEs, panelZhHans, panelZhHant } from '../src/i18n/panel.js';
 
 test('mergeConfig accepts the panel layout and validates panel options', () => {
   const config = mergeConfig({ lineLayout: 'panel', panel: { icons: 'nerd', maxAgents: 99, completedRetentionSeconds: -5 } });
@@ -22,5 +23,12 @@ test('the Spanish locale covers every English message key', () => {
     assert.equal(t('panel.activity'), 'actividad');
   } finally {
     setLanguage('en');
+  }
+});
+
+test('panel messages define the same keys in every locale', () => {
+  const expected = Object.keys(panelEn).sort();
+  for (const locale of [panelEs, panelZhHans, panelZhHant]) {
+    assert.deepEqual(Object.keys(locale).sort(), expected);
   }
 });

@@ -1,4 +1,5 @@
 import type { Messages } from "./types.js";
+import { panelEs } from "./panel.js";
 
 export const es: Messages = {
   // Labels
@@ -38,47 +39,9 @@ export const es: Messages = {
   "format.relativeTime": "hace {value}",
   "format.elapsed": "{value}% transcurrido",
 
-  // Panel layout
-  "panel.session": "sesión",
-  "panel.usage": "consumo",
-  "panel.environment": "entorno",
-  "panel.activity": "actividad",
-  "panel.context": "contexto",
-  "panel.fiveHour": "5 horas",
-  "panel.weekly": "semanal",
-  "panel.tasks": "tareas",
-  "panel.tools": "herramientas",
-  "panel.rules": "reglas",
-  "panel.hooks": "hooks",
-  "panel.cache": "caché",
-  "panel.col.agent": "AGENTE",
-  "panel.col.task": "TAREA",
-  "panel.col.skills": "SKILLS",
-  "panel.col.progress": "PROGRESO",
-  "panel.col.now": "AHORA",
-  "panel.col.tokens": "TOK",
-  "panel.col.time": "TIEMPO",
-  "panel.agentsRunning": "{count} activos",
-  "panel.agentsDone": "{count} listos",
-  "panel.agentsRunningOne": "{count} activo",
-  "panel.agentsDoneOne": "{count} listo",
-  "panel.moreAgents": "+{count} más",
-  "panel.noPlan": "sin plan",
-  "panel.uses": "{count} usos",
-  "panel.done": "listo",
-  "panel.thinking": "pensando…",
-  "panel.idle": "inactivo {duration}",
-  "panel.noActivity": "sin actividad aún",
-  "panel.noGit": "sin git",
-  "panel.compact": "/compact",
-  "panel.tokens": "tok",
-  "panel.cacheShare": "{percent}% caché",
-  "panel.adviceNow": "nueva sesión",
-  "panel.adviceColdCache": "caché fría, reescribe {tokens}",
-  "panel.adviceSoon": "nueva sesión pronto",
-
   // Init
   "init.initializing": "[claude-hud] Inicializando...",
   "init.macosNote":
     "[claude-hud] Nota: en macOS puede que tengas que reiniciar Claude Code para que aparezca el HUD.",
+  ...panelEs,
 };
