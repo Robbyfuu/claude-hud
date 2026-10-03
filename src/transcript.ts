@@ -128,7 +128,7 @@ class Parser {
   private taskIndex = new Map<string, number>();
   private agentCompletions = new Map<string, Date>();
   // Background agents die with their Claude Code process; teammates report it as an idle notification.
-  private lastProcessStart: Date | undefined;
+  private restarts: Date[] = [];
   private teammateIdle: { name: string; at: Date }[] = [];
   private toolCounts: Record<string, number> = Object.create(null); // null prototype: tool names are untrusted keys
   // Claude Code logs one API response several times, sometimes non-adjacently, so usage
@@ -162,13 +162,9 @@ class Parser {
     if (at && entry.type === 'attachment') {
       // compact/clear fire SessionStart inside the same process, so only these two mean a restart.
       const hook = entry.attachment?.hookName;
-      if (hook === 'SessionStart:startup' || hook === 'SessionStart:resume') this.lastProcessStart = at;
+      if (hook === 'SessionStart:startup' || hook === 'SessionStart:resume') this.restarts.push(at);
     }
-    if (at && entry.type === 'user' && typeof entry.message?.content === 'string') {
-      for (const m of entry.message.content.matchAll(/<teammate-message teammate_id="([^"]+)"[^>]*>([\s\S]*?)<\/teammate-message>/g)) {
-        if (m[2].includes('"idle_notification"')) this.teammateIdle.push({ name: m[1], at });
-      }
-    }
+    if (at && entry.type === 'user' && typeof entry.message?.content === 'string') this.idleNotifications(entry.message.content, at);
     if (entry.type === 'user' && typeof entry.message?.content === 'string') {
       const effort = EFFORT_COMMAND.exec(entry.message.content);
       if (effort) this.data.ultracodeActive = effort[1].toLowerCase() === 'ultracode';
@@ -236,6 +232,27 @@ class Parser {
     const fingerprint = JSON.stringify(usage);
     if (fingerprint !== this.lastIdlessUsage) addUsage(this.settled, usage);
     this.lastIdlessUsage = fingerprint;
+  }
+
+  // Linear scan: a regex with a lazy body goes quadratic on many unclosed openers.
+  private idleNotifications(content: string, at: Date): void {
+    if (!content.includes('idle_notification')) return;
+    const open = '<teammate-message teammate_id="';
+    // At most 100 messages per line bounds the work on one line without dropping later lines.
+    for (let i = content.indexOf(open), n = 0; i >= 0 && n < 100; i = content.indexOf(open, i + 1), n++) {
+      const idEnd = content.indexOf('"', i + open.length);
+      const bodyStart = idEnd < 0 ? -1 : content.indexOf('>', idEnd);
+      const bodyEnd = bodyStart < 0 ? -1 : content.indexOf('</teammate-message>', bodyStart);
+      if (bodyEnd < 0) return;
+      const teammate = name(content.slice(i + open.length, idEnd));
+      try {
+        const body: unknown = JSON.parse(content.slice(bodyStart + 1, bodyEnd));
+        if (teammate && (body as { type?: unknown } | null)?.type === 'idle_notification') this.teammateIdle.push({ name: teammate, at });
+      } catch {
+        // not JSON: an ordinary message
+      }
+      i = bodyEnd;
+    }
   }
 
   private toolUse(block: Block, at: Date, sidechain: boolean): void {
@@ -350,19 +367,11 @@ class Parser {
       const agent = this.agents.get(id);
       if (agent?.background) agent.endTime = endTime;
     }
-    // ponytail: a teammate woken again by SendMessage after going idle shows as completed until
-    // its next idle; tracking wake-ups needs the SendMessage calls.
-    const running = (agent: AgentEntry) => agent.background && agent.status === 'running' && !agent.endTime;
-    for (const { name, at } of this.teammateIdle) {
-      for (const agent of this.agents.values()) {
-        if (running(agent) && agent.name === name && agent.startTime <= at) agent.endTime = at;
-      }
-    }
-    const restart = this.lastProcessStart;
-    if (restart) {
-      for (const agent of this.agents.values()) {
-        if (running(agent) && agent.startTime < restart) agent.endTime = restart;
-      }
+    for (const agent of this.agents.values()) {
+      if (!agent.background || agent.endTime) continue;
+      const idle = this.teammateIdle.find((n) => n.name === agent.name && agent.startTime <= n.at);
+      const restart = this.restarts.find((r) => agent.startTime < r);
+      agent.endTime = idle && restart ? new Date(Math.min(+idle.at, +restart)) : idle?.at ?? restart;
     }
     for (const agent of this.agents.values()) {
       if (agent.endTime) agent.status = 'completed';

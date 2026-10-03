@@ -108,6 +108,65 @@ test('an idle notification before the launch does not complete a relaunch with t
   assert.equal(result.agents[0].status, 'running');
 });
 
+test('an agent ends at the first idle notification after it started, even when it went idle again later', async () => {
+  const result = await parse([
+    launch('a', '2026-10-01T00:00:00.000Z', { name: 'a' }),
+    teammateIdle('2026-10-01T00:03:00.000Z', 'a'),
+    teammateIdle('2026-10-01T00:09:00.000Z', 'a'),
+  ]);
+  assert.equal(result.agents[0].endTime?.toISOString(), '2026-10-01T00:03:00.000Z');
+});
+
+test('foreground agents and real queue completions are not overridden by a restart or idle event', async () => {
+  const result = await parse([
+    { type: 'assistant', timestamp: '2026-10-01T00:00:00.000Z', message: { content: [{ type: 'tool_use', id: 'fg', name: 'Agent', input: { name: 'fg' } }] } },
+    launch('bg', '2026-10-01T00:00:00.000Z', { name: 'bg' }),
+    { type: 'queue-operation', operation: 'enqueue', timestamp: '2026-10-01T00:01:00.000Z', content: '<task-id>t</task-id><tool-use-id>bg</tool-use-id>' },
+    sessionStart('2026-10-01T01:00:00.000Z', 'resume'),
+    teammateIdle('2026-10-01T02:00:00.000Z', 'fg'),
+    teammateIdle('2026-10-01T02:00:00.000Z', 'bg'),
+  ]);
+  const [fg, bg] = result.agents;
+  assert.deepEqual([fg.status, fg.endTime], ['running', undefined]);
+  assert.equal(bg.endTime?.toISOString(), '2026-10-01T00:01:00.000Z');
+});
+
+test('only a teammate message whose JSON body is an idle_notification ends an agent', async () => {
+  const message = (body) => ({
+    type: 'user',
+    timestamp: '2026-10-01T00:03:00.000Z',
+    message: { content: `<teammate-message teammate_id="mapper">${body}</teammate-message>` },
+  });
+  const result = await parse([
+    launch('mapper', '2026-10-01T00:00:00.000Z', { name: 'mapper' }),
+    message('please explain what an "idle_notification" is'),
+    message('{"type":"task","note":"idle_notification"}'),
+  ]);
+  assert.equal(result.agents[0].status, 'running');
+});
+
+test('many unclosed teammate-message openers parse in linear time', async () => {
+  const content = '<teammate-message teammate_id="a">'.repeat(20000) + ' idle_notification';
+  const start = performance.now();
+  const result = await parse([
+    launch('a', '2026-10-01T00:00:00.000Z', { name: 'a' }),
+    { type: 'user', timestamp: '2026-10-01T00:03:00.000Z', message: { content } },
+  ]);
+  const elapsed = performance.now() - start;
+  assert.ok(elapsed < 1000, `took ${elapsed}ms`);
+  assert.equal(result.agents[0].status, 'running');
+});
+
+test('parseTranscript ends a teammate that goes idle after 1000 earlier idle notifications', async () => {
+  const others = Array.from({ length: 1001 }, (_, i) => teammateIdle('2026-10-01T00:00:00.000Z', `other-${i}`));
+  const result = await parse([
+    ...others,
+    launch('late', '2026-10-01T00:01:00.000Z', { name: 'late' }),
+    teammateIdle('2026-10-01T00:05:00.000Z', 'late'),
+  ]);
+  assert.deepEqual([result.agents[0].status, result.agents[0].endTime?.toISOString()], ['completed', '2026-10-01T00:05:00.000Z']);
+});
+
 test('parseTranscript counts every tool use and maps task ids Claude Code assigns', async () => {
   await withTempDir(async (dir) => {
     const file = path.join(dir, 'main.jsonl');

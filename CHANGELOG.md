@@ -11,6 +11,7 @@ All notable changes to Claude HUD will be documented in this file.
 
 ### Fixed
 - A folder name containing ` │ ` no longer leaves the project link open over the rest of the HUD when line 1 wraps.
+- Teammate idle notifications are scanned linearly, so a message with many unclosed `<teammate-message` openers no longer stalls the parser. (Fork only.)
 
 ## [0.10.0] - 2026-10-01
 
