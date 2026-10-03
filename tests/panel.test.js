@@ -711,3 +711,18 @@ test('renderPanel shows only the nerd worktree glyph for a UUID worktree name', 
   assert.match(line, /quahog  /);
   assert.doesNotMatch(line, /ecedf77f|42254|⎇/);
 });
+
+test('renderPanel falls back to the full name for a bare MCP name with no tool part', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  assert.match(toolsLine({ mcp__x: 2, Bash: 1 }, NOW), /mcp__x 2/);
+  assert.match(toolsLine({ mcp__x__: 2, Bash: 1 }, NOW), /mcp__x__ 2/);
+});
+
+test('renderPanel keeps thinking when lastActivityAt is in the future', () => {
+  setLanguage('en');
+  const NOW = Date.now();
+  const line = stripAnsi(agentLine(stallCtx({ lastActivityAt: new Date(NOW + 10 * 60_000) }, NOW), NOW));
+  assert.match(line, /thinking…/);
+  assert.doesNotMatch(line, /idle/);
+});

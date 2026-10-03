@@ -187,9 +187,11 @@ function quotaColor(percent: number, base: string): string {
   return base;
 }
 
-/** `mcp__<server>__<tool>` becomes `<tool>`; other names pass through. */
+/** `mcp__<server>__<tool>` becomes `<tool>`; every other name, including malformed MCP names, passes through. */
 function shortToolName(name: string): string {
-  return name.startsWith('mcp__') ? name.slice(name.lastIndexOf('__') + 2) || name : name;
+  const split = name.lastIndexOf('__');
+  // The server segment needs at least one character after "mcp__", and so does the tool.
+  return name.startsWith('mcp__') && split > 'mcp__'.length && split + 2 < name.length ? name.slice(split + 2) : name;
 }
 
 function label(key: MessageKey): string {
