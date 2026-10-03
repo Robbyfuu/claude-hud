@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { panelLines } from '../src/render/panel.js';
+import { panelLines, formatCount } from '../src/render/panel.js';
 import { createFrame } from '../src/render/frame.js';
 import { mergeConfig } from '../src/config.js';
 import { setLanguage } from '../src/i18n/index.js';
@@ -752,4 +752,16 @@ test('renderPanel keeps the tool part after the first MCP separator', () => {
   assert.match(collide, /a:x__y 2/);
   assert.match(collide, /b:x__y 1/);
   assert.match(stripAnsi(agentLine(stallCtx({ currentTool: { name: 'mcp__srv__foo__bar' } }, NOW), NOW)), /foo__bar/);
+});
+
+test('formatCount picks the unit from the rounded value', () => {
+  const cases = [
+    [1_791_000_000, '1.8B'],
+    [12_400_000_000, '12B'],
+    [999_600, '1M'],
+    [999_700_000, '1B'],
+    [1_500_000, '1.5M'],
+    [45_000, '45k'],
+  ];
+  for (const [input, expected] of cases) assert.equal(formatCount(input), expected, String(input));
 });

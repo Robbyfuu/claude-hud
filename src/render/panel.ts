@@ -155,9 +155,18 @@ function formatDuration(ms: number): string {
   return `${hours}h ${String(mins % 60).padStart(2, '0')}m`;
 }
 
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(/\.0$/, '')}M`;
-  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+export function formatCount(n: number): string {
+  // Pick the unit from the rounded value so a boundary never prints 1000k or 1000M.
+  const scaled = (value: number): string => (value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, ''));
+  if (n >= 1_000_000) {
+    const millions = scaled(n / 1_000_000);
+    if (Number(millions) < 1000) return `${millions}M`;
+    return `${scaled(n / 1_000_000_000)}B`;
+  }
+  if (n >= 1000) {
+    const thousands = Math.round(n / 1000);
+    return thousands < 1000 ? `${thousands}k` : '1M';
+  }
   return String(n);
 }
 
