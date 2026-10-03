@@ -238,8 +238,7 @@ class Parser {
   private idleNotifications(content: string, at: Date): void {
     if (!content.includes('idle_notification')) return;
     const open = '<teammate-message teammate_id="';
-    // Each iteration either returns (opener without a closing tag) or jumps past its closed body,
-    // so every character is visited a bounded number of times and no per-line message cap is needed.
+    // Linear: an opener with no closing tag returns, and `i = bodyEnd` skips each closed body.
     for (let i = content.indexOf(open); i >= 0; i = content.indexOf(open, i + 1)) {
       const idEnd = content.indexOf('"', i + open.length);
       const bodyStart = idEnd < 0 ? -1 : content.indexOf('>', idEnd);
