@@ -453,3 +453,17 @@ test('parseSubagentTranscript reads the last line\'s own timestamp, not one nest
     assert.equal(detail.lastActivityAt.toISOString(), '2026-01-01T00:06:00.000Z');
   });
 });
+
+test('readSubagentTokenTotals does not cache a non-empty transcript that parsed to zero tokens', async () => {
+  await withTempDir(async (dir) => {
+    const transcriptPath = path.join(dir, 'projects', 'p', 'sess.jsonl');
+    await writeJsonl(transcriptPath, []);
+    const subagentsDir = getSubagentsDir(transcriptPath);
+    await writeJsonl(path.join(subagentsDir, 'agent-a.jsonl'), [{ type: 'user', message: { role: 'user', content: 'hello' } }]);
+    await writeJsonl(path.join(subagentsDir, 'agent-b.jsonl'), [usageLine('msg_b1', 10, 20, 30, 40)]);
+    assert.equal((await readSubagentTokenTotals(transcriptPath)).inputTokens, 10);
+    const cache = JSON.parse(fs.readFileSync(tokenCachePath(subagentsDir), 'utf8'));
+    assert.equal('agent-a.jsonl' in cache.files, false);
+    assert.equal('agent-b.jsonl' in cache.files, true);
+  });
+});

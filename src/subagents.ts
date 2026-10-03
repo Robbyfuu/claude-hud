@@ -555,7 +555,9 @@ export async function readSubagentTokenTotals(transcriptPath: string): Promise<S
       tokens = (await parseTranscript(file)).sessionTokens;
     }
     if (!tokens) continue;
-    if (stat) next[name] = { size: stat.size, mtimeMs: stat.mtimeMs, tokens };
+    // parseTranscript fails soft: a read error yields zero tokens. Don't freeze that under size+mtime.
+    const allZero = !tokens.inputTokens && !tokens.outputTokens && !tokens.cacheCreationTokens && !tokens.cacheReadTokens;
+    if (stat && !(allZero && stat.size > 0)) next[name] = { size: stat.size, mtimeMs: stat.mtimeMs, tokens };
     total.inputTokens += tokens.inputTokens;
     total.outputTokens += tokens.outputTokens;
     total.cacheCreationTokens += tokens.cacheCreationTokens;
