@@ -423,3 +423,16 @@ test('parseSubagentTranscript keeps a long MCP tool name whole', async () => {
     assert.equal(parseSubagentTranscript(file).currentTool.name, name);
   });
 });
+
+test('parseSubagentTranscript takes the last line timestamp even when the prefilter skips it', async () => {
+  await withTempDir(async (dir) => {
+    const file = path.join(dir, 'agent-last.jsonl');
+    await writeJsonl(file, [
+      at('2026-01-01T00:00:00.000Z', toolUse('t1', 'Bash', { command: 'ls' })),
+      at('2026-01-01T00:00:00.000Z', toolResult('t1')),
+      { type: 'user', timestamp: '2026-01-01T00:06:00.000Z', message: { role: 'user', content: 'keep going' } },
+    ]);
+    const detail = parseSubagentTranscript(file);
+    assert.equal(detail.lastActivityAt.toISOString(), '2026-01-01T00:06:00.000Z');
+  });
+});
