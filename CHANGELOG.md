@@ -5,6 +5,7 @@ All notable changes to Claude HUD will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `panel` layout lists other active Claude Code sessions (project, running subagents, idle time) in a `sessions` row under the tools row, read from the Claude config dir. (Fork only.)
 - The `panel` layout honours `display.usagePace`: the 5-hour and weekly rows turn amber or red with a `▲` when on pace to run out. (Fork only.)
 - The `panel` layout honours `display.showSessionName`, adding the session name to the session box title. (Fork only.)
 - The `panel` cache row shows the time until a warm cache expires, and the context tokens a cold cache would rewrite. (Fork only.)

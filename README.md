@@ -247,6 +247,8 @@ The environment box's cache row appends `3✗ 284k` when Claude Code reports pro
 The session box's model row appends `API 7m`, the time spent waiting on the model API, once it reaches one minute.
 The panel honours `display.usagePace`, marking a 5-hour or weekly window on pace to run out with `▲` (`60%▲`, amber or red), and `display.showSessionName`, which adds the session name to the session box title (`session · auth-fix`).
 The cache row shows the time until a warm cache expires (`cache 92% ● 47m`, amber in the last two minutes) and, when the cache is cold, the context tokens the next request would rewrite (`cache 40% ○ ↻300k`, amber from 200k).
+When other Claude Code sessions have written to their transcript in the last 15 minutes, the activity box adds a `sessions` row under the tools row: each session's project, a spinner with the number of subagents that wrote in the last 2 minutes, and `idle 9m` once it has been quiet for a minute (`sessions  clay-academy ⠋1 · icloud-sync idle 9m`). Sessions are read from `projects/` in the Claude config dir (`CLAUDE_CONFIG_DIR`); at most four are shown, the rest as `+N`.
+
 A running subagent with no pending tool and no transcript activity for 5 minutes shows `idle 7m` in amber in its NOW cell instead of `thinking…`; a pending tool call never counts as idle.
 MCP tools show only the tool part of `mcp__<server>__<tool>` (`ctx_execute 5`), falling back to `server:tool` when two servers expose the same tool name.
 A worktree whose name contains a UUID (such as Orca's) shows only the worktree glyph in the session box, since the project label already names the folder.
