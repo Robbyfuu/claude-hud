@@ -238,8 +238,9 @@ class Parser {
   private idleNotifications(content: string, at: Date): void {
     if (!content.includes('idle_notification')) return;
     const open = '<teammate-message teammate_id="';
-    // At most 100 messages per line bounds the work on one line without dropping later lines.
-    for (let i = content.indexOf(open), n = 0; i >= 0 && n < 100; i = content.indexOf(open, i + 1), n++) {
+    // Each iteration either returns (opener without a closing tag) or jumps past its closed body,
+    // so every character is visited a bounded number of times and no per-line message cap is needed.
+    for (let i = content.indexOf(open); i >= 0; i = content.indexOf(open, i + 1)) {
       const idEnd = content.indexOf('"', i + open.length);
       const bodyStart = idEnd < 0 ? -1 : content.indexOf('>', idEnd);
       const bodyEnd = bodyStart < 0 ? -1 : content.indexOf('</teammate-message>', bodyStart);

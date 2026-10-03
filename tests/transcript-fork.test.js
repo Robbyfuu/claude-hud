@@ -146,15 +146,28 @@ test('only a teammate message whose JSON body is an idle_notification ends an ag
 });
 
 test('many unclosed teammate-message openers parse in linear time', async () => {
-  const content = '<teammate-message teammate_id="a">'.repeat(20000) + ' idle_notification';
+  const content = '<teammate-message teammate_id="a">'.repeat(100_000) + ' idle_notification';
   const start = performance.now();
   const result = await parse([
     launch('a', '2026-10-01T00:00:00.000Z', { name: 'a' }),
     { type: 'user', timestamp: '2026-10-01T00:03:00.000Z', message: { content } },
   ]);
   const elapsed = performance.now() - start;
-  assert.ok(elapsed < 1000, `took ${elapsed}ms`);
+  assert.ok(elapsed < 5000, `took ${elapsed}ms`);
   assert.equal(result.agents[0].status, 'running');
+});
+
+test('parseTranscript records an idle notification after more than 100 teammate messages in one entry', async () => {
+  const wrap = (id, body) => `<teammate-message teammate_id="${id}">${body}</teammate-message>`;
+  const content =
+    Array.from({ length: 150 }, (_, i) => wrap(`other-${i}`, '{"type":"message"}')).join('\n') +
+    '\n' +
+    wrap('late', '{"type":"idle_notification"}');
+  const result = await parse([
+    launch('late', '2026-10-01T00:00:00.000Z', { name: 'late' }),
+    { type: 'user', timestamp: '2026-10-01T00:05:00.000Z', message: { content } },
+  ]);
+  assert.deepEqual([result.agents[0].status, result.agents[0].endTime?.toISOString()], ['completed', '2026-10-01T00:05:00.000Z']);
 });
 
 test('parseTranscript ends a teammate that goes idle after 1000 earlier idle notifications', async () => {
