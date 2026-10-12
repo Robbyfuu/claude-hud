@@ -94,7 +94,7 @@ test('readAuthInfo honors CLAUDE_CONFIG_DIR and handles unreadable profiles', as
     // Claude Code keeps claude.json INSIDE the overridden config directory.
     const jsonPath = path.join(configDir, '.claude.json');
     await writeFile(jsonPath, JSON.stringify(MAX_ACCOUNT), 'utf8');
-    assert.deepEqual(readAuthInfo(), { method: 'Claude Max 20x', user: 'someone.long' });
+    assert.deepEqual(readAuthInfo(), { method: 'Claude Max 20x', user: 'someone.long', email: 'someone.long@example.com' });
 
     await writeFile(jsonPath, '{invalid', 'utf8');
     assert.deepEqual(readAuthInfo(), { method: null, user: null });
@@ -210,4 +210,28 @@ test('readAuthInfo detects same-size rewrites with a restored mtime', async () =
     restoreEnvVar('ANTHROPIC_API_KEY', originalKey);
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('deriveSwapAlias matches the logged-in email to its claude-swap alias', async () => {
+  const { deriveSwapAlias } = await import('../src/auth.ts');
+  const sequence = {
+    activeAccountNumber: 1,
+    accounts: {
+      1: { email: 'roberto@work.com', alias: 'trabajo' },
+      2: { email: 'Me@Gmail.com', alias: 'personal' },
+      3: { email: 'none@x.com' },
+    },
+  };
+  assert.equal(deriveSwapAlias(sequence, 'me@gmail.com'), 'personal');
+  assert.equal(deriveSwapAlias(sequence, 'none@x.com'), null);
+  assert.equal(deriveSwapAlias(sequence, 'unknown@x.com'), null);
+  assert.equal(deriveSwapAlias(sequence, null), 'trabajo');
+  assert.equal(deriveSwapAlias(null, 'me@gmail.com'), null);
+});
+
+test('formatAuthSegment puts the claude-swap alias first when showAccountAlias is on', () => {
+  const info = { method: 'Claude Max 20x', user: 'roberto', alias: 'trabajo' };
+  assert.equal(formatAuthSegment(info, { showAccountAlias: true, showAuth: true }), 'trabajo · Claude Max 20x');
+  assert.equal(formatAuthSegment(info, { showAccountAlias: true }), 'trabajo');
+  assert.equal(formatAuthSegment(info, { showAuth: true }), 'Claude Max 20x');
 });

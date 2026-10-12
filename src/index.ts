@@ -11,7 +11,7 @@ import { getJjStatus, isJjRepo } from "./jj.js";
 import { loadConfig, type HudConfig } from "./config.js";
 import { parseExtraCmdArg, runExtraCmd } from "./extra-cmd.js";
 import { getMemoryUsage } from "./memory.js";
-import { readAuthInfo } from "./auth.js";
+import { readAuthInfoWithAlias } from "./auth.js";
 import { getCostTotals } from "./daily-cost.js";
 import { getOutputSpeed } from "./speed.js";
 import { resolveUsage, writeExternalUsageSnapshot } from "./external-usage.js";
@@ -102,7 +102,7 @@ export async function main(): Promise<void> {
       memoryUsage,
       config,
       extraLabel,
-      authInfo: display.showAuth || display.showAuthUser ? readAuthInfo() : null,
+      authInfo: display.showAuth || display.showAuthUser || display.showAccountAlias ? readAuthInfoWithAlias() : null,
       subagents,
       subagentTokens,
       panelAgents,
