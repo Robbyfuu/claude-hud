@@ -156,6 +156,8 @@ export interface HudConfig {
     showSessionName: boolean;
     showAuth: boolean;
     showAuthUser: boolean;
+    // claude-swap alias of the active account (e.g. "trabajo").
+    showAccountAlias: boolean;
     // Max characters of the account name (0 = full).
     authUserLength: number;
     showClaudeCodeVersion: boolean;
@@ -260,6 +262,7 @@ export const DEFAULT_CONFIG: HudConfig = {
     showSessionName: false,
     showAuth: false,
     showAuthUser: false,
+    showAccountAlias: false,
     authUserLength: 8,
     showClaudeCodeVersion: false,
     showEffortLevel: false,
